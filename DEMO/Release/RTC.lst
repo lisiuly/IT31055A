@@ -1,0 +1,1275 @@
+        Generalplus 6502 Assembler - Version 1.7.1.0  
+              Listing File Has Been Relocated
+
+     1                              .Include	SYS\Macro.inc
+     2                      <       
+     3                      <       ;==========================================
+     4                      <       ; Constant define area
+     5                      <       C_SramAddrStart		    .EQU		0080H	;SRAM start address
+     6                      <       C_SramAddrEnd   		.EQU		00FFH	;SRAM end address
+     7                      <       C_DPRAMAddrStart		.EQU		3E00H	;DPRAM start address
+     8                      <       C_DPRAMAddrEnd   		.EQU		3FFFH	;DPRAM end address
+     9                      <       
+    10                      <       D_Bit0					equ		01H
+    11                      <       D_Bit1					equ		02H
+    12                      <       D_Bit2					equ		04H
+    13                      <       D_Bit3					equ		08H
+    14                      <       D_Bit4					equ		10H
+    15                      <       D_Bit5					equ		20H
+    16                      <       D_Bit6					equ		40H
+    17                      <       D_Bit7					equ		80H
+    18                      <       
+    19                      <       C_High		equ	0x01
+    20                      <       C_Input		equ	0x00
+    21                      <       
+    22                      <       ;PCDir for 1  is output, for 0 is input
+    23                      <       C_PC0Dir	equ	D_Bit0
+    24                      <       C_PC1Dir	equ	D_Bit1
+    25                      <       C_PC2Dir	equ	D_Bit2
+    26                      <       C_PC3Dir	equ	D_Bit3
+    27                      <       C_PC6Dir	equ	D_Bit6
+    28                      <       C_PC7Dir	equ	D_Bit7
+    29                      <       
+    30                      <       D_BLight	equ	D_Bit2
+    31                      <       D_Pulse		equ	D_Bit3
+    32                      <       D_LVD		equ	D_Bit5
+    33                      <       
+    34                      <       
+    35                      <       C_MusicOne	equ	21
+    36                      <       C_MusicAll	equ	22
+    37                      <       C_MusicStop	equ	23
+    38                      <       C_MinVol	equ	31
+    39                      <       C_MaxVol	equ	45
+    40                      <       
+    41                      <       ;;============================================================================
+    42                      <       ;Macro Name: %M_ClearWatchDog
+    43                      <       ;Purpose: Clear Watchdog
+    44                      <       ;Destroy: A
+    45                      <       ;;============================================================================
+    46                      <       %M_ClearWatchDog:		.MACRO 
+    47                      <       	LDA		#D_WDT_Clear
+    48                      <       	STA		P_WDT_Flag_Clear			; Clear WDT
+    49                      <       	.ENDM
+    50                      <       ;;============================================================================
+    51                      <       ;Macro Name: %M_DisAllInt
+    52                      <       ;Purpose: Disable all interrupt 
+    53                      <       ;Destroy: A
+    54                      <       ;;============================================================================
+    55                      <       %F_InitINT:		.MACRO
+    56                      <       		LDA		#00000111b		;2HZ （bit0~2) for 111 is 4K 			;timeBaseA 2hz timeBaseB 16hz
+    57                      <       		STA		P_TIMER_TimeBase_Sel		
+    58                      <       		LDA		#D_128HzInt+D_TMBAInt+D_TMBBInt;+D_Timer0Int
+    59                      <       		STA		P_INT_Ctrl
+    60                      <       		LDA		#00
+    61                      <       		STA		P_INT_Ctrl2		;disable TMR1 INT
+    62                      <       ;		LDA		#D_TimerEn+D_TimerFallEdge+D_TimerSrcA_VDD+D_TimerSrcB_LF
+    63                      <       ;		STA		P_TIMER_Timer0_Ctrl
+    64                      <       ;		LDA		#0xC8
+    65                      <       ;		LDA		#0xFC
+    66                      <       ;		STA		P_TIMER_TM0Data_LB		;8k
+    67                      <       ;		LDA		#0xFF
+    68                      <       ;		STA		P_TIMER_TM0Data_HB
+    69                      <       	.ENDM
+    70                      <       ;;============================================================================
+    71                      <       ;Macro Name: %DisableLCD
+    72                      <       ;Purpose: Disable LCD
+    73                      <       ;Destroy: A
+    74                      <       ;;============================================================================
+    75                      <       %DisableLCD:		.MACRO
+    76                      <       	
+    77                      <       		LDA		#(D_Duty_1_5+D_Bias_1_4)	;+D_ScanEnable)
+    78                      <       		STA		P_LCD_Ctrl		;1/11duty,1/4bias,normal scan
+    79                      <       		
+    80                      <       		LDA     #D_VLCD_33         ;VLCD = 4.5V (max value)
+    81                      <       		STA     P_LCD_VLCD_Ctrl
+    82                      <       	.ENDM
+    83                      <       ;-----------------------------------------------------------------------------
+    84                      <       ; Macro Name:	%M_InitLCD
+    85                      <       ; Description:	Initialize LCD configuration after power on
+    86                      <       ;-----------------------------------------------------------------------------	
+    87                      <       ;%M_InitLCD:		.MACRO
+    88                      <       ;    LDA		#D_LCDMode_Normal+D_LCDSetting_3Bias_4Duty+D_LCDGreenMode_En
+    89                      <       ;;	LDA		#(D_LCDMode_Normal+D_LCDSetting_3Bias_4Duty)
+    90                      <       ;	STA		P_LCD_Ctrl		;1/4duty,1/3bias,normal scan
+    91                      <       ;
+    92                      <       ;	.ENDM
+    93                      <       ;-----------------------------------------------------------------------------
+    94                      <       ; Macro Name:	%FillLcdDpram
+    95                      <       ; Description:	Fill LCD DPRAM $50 ~$5F
+    96                      <       ;-----------------------------------------------------------------------------
+    97                      <       ;%FillLcdDpram	.MACRO	mData
+    98                      <       ;		
+    99                      <       ;		%M_ClearWatchDog
+   100                      <       ;		LDX		#00H
+   101                      <       ;		LDA     mData
+   102                      <       ;?L_ClrDpramLoop:
+   103                      <       ;		STA		$50,X
+   104                      <       ;		INX
+   105                      <       ;		CPX		#10H
+   106                      <       ;		BNE		?L_ClrDpramLoop	
+   107                      <       ;
+   108                      <       ;	.ENDM
+   109                      <       
+   110                      <       ;;==========================================================================
+   111                      <       ;;Macro Name: %M_SetPC7_InputPL                 Attrib     Dir    Data
+   112                      <       ;;Purpose: Set PortC7 iutput pull low            0          0      1
+   113                      <       ;;Destroy: A
+   114                      <       ;;==========================================================================
+   115                      <       ;%M_SetPC7_InputPL:	.MACRO
+   116                      <       ;	    LDA		P_IO_PortC_Attrib
+   117                      <       ;		AND     #7FH
+   118                      <       ;		STA		P_IO_PortC_Attrib
+   119                      <       ;		
+   120                      <       ;		LDA		P_IO_PortC_Dir
+   121                      <       ;		AND     #7FH
+   122                      <       ;		STA		P_IO_PortC_Dir
+   123                      <       ;		
+   124                      <       ;		LDA		P_IO_PortC_Buffer
+   125                      <       ;		ORA		#10000000B
+   126                      <       ;		STA		P_IO_PortC_Data
+   127                      <       ;
+   128                      <       ;			.ENDM
+   129                      <       ;;==========================================================================
+   130                      <       ;;Macro Name: %M_SetPC7_InputPH               Attrib     Dir    Data
+   131                      <       ;;Purpose: Set PortC7 iutput pull high         1          0      1
+   132                      <       ;;Destroy: A
+   133                      <       ;;==========================================================================
+   134                      <       ;%M_SetPC7_InputPH:	.MACRO
+   135                      <       ;	    LDA		P_IO_PortC_Attrib
+   136                      <       ;		ORA     #80H
+   137                      <       ;		STA		P_IO_PortC_Attrib
+   138                      <       ;		
+   139                      <       ;		LDA		P_IO_PortC_Dir
+   140                      <       ;		AND     #7FH
+   141                      <       ;		STA		P_IO_PortC_Dir
+   142                      <       ;		
+   143                      <       ;		LDA		P_IO_PortC_Buffer
+   144                      <       ;		ORA		#10000000B
+   145                      <       ;		STA		P_IO_PortC_Data
+   146                      <       ;
+   147                      <       ;			.ENDM
+   148                      <       ;;==========================================================================
+   149                      <       ;;Macro Name: %M_SetPC7_Output               Attrib     Dir    Data
+   150                      <       ;;Purpose: Set PortC7 driving  low            0          1      0
+   151                      <       ;;Destroy: A
+   152                      <       ;;==========================================================================
+   153                      <       ;%M_SetPC7_OutputL:	.MACRO
+   154                      <       ;        LDA		P_IO_PortC_Attrib
+   155                      <       ;		AND     #7FH
+   156                      <       ;		STA		P_IO_PortC_Attrib
+   157                      <       ;		
+   158                      <       ;		LDA		P_IO_PortC_Dir
+   159                      <       ;		ORA     #80H
+   160                      <       ;		STA		P_IO_PortC_Dir
+   161                      <       ;		
+   162                      <       ;		LDA		P_IO_PortC_Buffer
+   163                      <       ;		AND		#01111111b
+   164                      <       ;		STA		P_IO_PortC_Data
+   165                      <       ;			.ENDM
+   166                      <       ;;==========================================================================
+   167                      <       ;;Macro Name: %M_SetPC7_Output             Attrib     Dir    Data
+   168                      <       ;;Purpose: Set PortC7 driving  high          0         1      1
+   169                      <       ;;Destroy: A
+   170                      <       ;;==========================================================================
+   171                      <       ;%M_SetPC7_OutputH:	.MACRO
+   172                      <       ;        LDA		P_IO_PortC_Attrib
+   173                      <       ;		AND     #7FH
+   174                      <       ;		STA		P_IO_PortC_Attrib
+   175                      <       ;		
+   176                      <       ;		LDA		P_IO_PortC_Dir
+   177                      <       ;		ORA     #80H
+   178                      <       ;		STA		P_IO_PortC_Dir
+   179                      <       ;		
+   180                      <       ;		LDA		P_IO_PortC_Buffer
+   181                      <       ;		ORA		#10000000B
+   182                      <       ;		STA		P_IO_PortC_Data
+   183                      <       ;		
+   184                      <       ;			.ENDM
+   185                      <       ;----------------------------------------------------------
+   186                      <       ;/***********************************************/
+   187                      <       ;         i.L=1 
+   188                      <       %bits:   .MACRO   i,L             ;BYTE i;  
+   189                      <                 lda     i               ;ex.  
+   190                      <                 ora     #L              ;  %bits 10H,_BIT0
+   191                      <       		                   ;  10H.0=1
+   192                      <                 sta     i               ;
+   193                      <                .ENDM    
+   194                      <       
+   195                      <       ;/***********************************************/
+   196                      <       ;         i.L=0
+   197                      <       %bitr:   .MACRO   i,L             ;BYTE i;  
+   198                      <                 lda     i               ;ex.  
+   199                      <                 and     #.NOT.L         ;  %bitr 10H,_BIT0;  10H.0=0
+   200                      <                 sta     i
+   201                      <                .ENDM    
+   202                      <       
+   203                      <       ;/***********************************************/
+   204                      <       ;         if(i.L==1) goto N
+   205                      <       %btst:   .MACRO   i,L,N           ;BYTE i;  
+   206                      <                 lda     i               ;ex.   
+   207                      <                 and     #L              ;  %btst 10H,_BIT0,N
+   208                      <                 bne     N               ;  if(10H.0=1) goto N 
+   209                      <                .ENDM    
+   210                      <                                         
+   211                      <       ;/***********************************************/
+   212                      <       ;         if(i.L==0) goto N
+   213                      <       %btsf:   .MACRO   i,L,N           ;BYTE i;    
+   214                      <                 lda     i               ;ex.   
+   215                      <                 and     #L              ;  %btsf 10H,_BIT0,N
+   216                      <                 beq     N               ;  if(10H.0=0) goto N 
+   217                      <                .ENDM    
+   218                      <       ;/***********************************************/
+   219                      <       ;         if(i==#0) goto N
+   220                      <       %jz:     .MACRO   i,N             ;BYTE i;
+   221                      <                 lda     i               ;ex.
+   222                      <                 beq     N               ;  %jz 10H,N
+   223                      <                .ENDM                    ;  if(10H==#0) goto N
+   224                      <       
+   225                      <       ;/***********************************************/
+   226                      <       ;         if(i!=#0) goto N
+   227                      <       %jnz:    .MACRO   i,N             ;BYTE i;
+   228                      <                 lda     i               ;ex.
+   229                      <                 bne     N               ;  %jnz 10H,N
+   230                      <                .ENDM                    ;  if($10!=#0) goto N
+   231                      <                   
+   232                      <       ;-----------------------------------------------------------------------------
+   233                      <       ; Macro Name:	%InitSystem
+   234                      <       ; Description:	Initial system port
+   235                      <       ;-----------------------------------------------------------------------------
+   236                      <       %InitSystem		.MACRO
+   237                      <       		LDA		#0
+   238                      <       		STA		P_Reset_Status	;Clear AC key reset flag
+   239                      <       		%Enable32KLF
+   240                      <       	.ENDM
+   241                      <       ;-----------------------------------------------------------------------------
+   242                      <       ; Macro Name:	%Disable32KLF
+   243                      <       ; Description:	Disable Low Frequency
+   244                      <       ;-----------------------------------------------------------------------------
+   245                      <       %Disable32KLF	.MACRO
+   246                      <       
+   247                      <       		LDA		#D_LFDisable
+   248                      <       		STA		P_CLK_32768_En
+   249                      <       
+   250                      <       		.ENDM
+   251                      <       ;-----------------------------------------------------------------------------
+   252                      <       ; Macro Name:	%Enable32KLF
+   253                      <       ; Description:	Enable Low Frequency
+   254                      <       ;-----------------------------------------------------------------------------
+   255                      <       %Enable32KLF		.MACRO
+   256                      <       
+   257                      <       		LDA		#D_LFEnable
+   258                      <       		STA		P_CLK_32768_En
+   259                      <       
+   260                      <       	.ENDM		
+   261                      <       ;-----------------------------------------------------------------------------
+   262                      <       ; Macro Name:	%InitLCD
+   263                      <       ; Description:	Initialize LCD configuration after power on
+   264                      <       ;-----------------------------------------------------------------------------	
+   265                      <       %InitLCD:		.MACRO
+   266                      <       
+   267                      <       		LDA		#(D_Duty_1_5+D_Bias_1_3+D_ScanEnable)
+   268                      <       		STA		P_LCD_Ctrl		;1/11duty,1/4bias,normal scan
+   269                      <       		
+   270                      <       		LDA     #D_VLCD_28            ;VLCD = 4.5V (max value)
+   271                      <       ;		LDA		#D_VLCD_VDD
+   272                      <       		STA     P_LCD_VLCD_Ctrl
+   273                      <       	
+   274                      <       	.ENDM
+   275                      <       ;-----------------------------------------------------------------------------
+   276                      <       ; Macro Name:	%FillSram
+   277                      <       ; Description:	Fill data to SRAM whole space
+   278                      <       ; Input:		mData
+   279                      <       ;-----------------------------------------------------------------------------	
+   280                      <       %FillSram		.MACRO	mData
+   281                      <       		
+   282                      <       		LDA		#.LOW.(C_SramAddrStart+2)
+   283                      <       		STA		C_SramAddrStart
+   284                      <       		LDA		#.HIGH.(C_SramAddrStart+2)
+   285                      <       		STA		C_SramAddrStart+1
+   286                      <       		
+   287                      <       		LDX     #0
+   288                      <       ?L_FillLoop#:
+   289                      <               LDA     mData
+   290                      <       		STA     (C_SramAddrStart,X)
+   291                      <       		
+   292                      <       		LDA     C_SramAddrStart+1
+   293                      <       		CMP     #.HIGH.C_SramAddrEnd
+   294                      <       		BCC     ?L_IncSramAddr#
+   295                      <       		LDA     C_SramAddrStart
+   296                      <       		CMP     #.LOW.C_SramAddrEnd
+   297                      <       		BCS     ?L_End#
+   298                      <       		
+   299                      <       ?L_IncSramAddr#:    ;Increase sram address
+   300                      <               INC     C_SramAddrStart
+   301                      <       		BNE     ?L_FillLoop#
+   302                      <       		INC     C_SramAddrStart+1
+   303                      <       		%WatchDogClear
+   304                      <               JMP     ?L_FillLoop#
+   305                      <       ?L_End#:
+   306                      <               
+   307                      <               LDA     mData
+   308                      <               STA     C_SramAddrStart
+   309                      <               STA     C_SramAddrStart+1
+   310                      <               
+   311                      <               LDX		#00H
+   312                      <       ?L_HSRAMloop:
+   313                      <       		LDA		mData
+   314                      <       		STA		$180,X
+   315                      <       		INX	
+   316                      <       		CPX		#80H
+   317                      <       		BNE		?L_HSRAMloop
+   318                      <       		
+   319                      <       	.ENDM
+   320                      <       	
+   321                      <       ;-----------------------------------------------------------------------------
+   322                      <       ; Macro Name:	%ClrSRAM
+   323                      <       ; Description:	Clear SRAM $60 ~ $95F
+   324                      <       ;-----------------------------------------------------------------------------	
+   325                      <       %ClrSRAM:	.MACRO
+   326                      <       
+   327                      <       		%FillSram	#0
+   328                      <       
+   329                      <       	.ENDM
+   330                      <       ;-----------------------------------------------------------------------------
+   331                      <       ;-----------------------------------------------------------------------------
+   332                      <       ; Macro Name:	%FillLcdDpram
+   333                      <       ; Description:	Fill LCD DPRAM $3E00 ~$3FFF
+   334                      <       ;-----------------------------------------------------------------------------
+   335                      <       %FillLcdDpram	.MACRO	mData
+   336                      <       		
+   337                      <       		%WatchDogClear
+   338                      <       		LDX		#00H
+   339                      <       		LDY		#00H
+   340                      <       ?L_ClrDpramLoop:
+   341                      <       		LDA     mData
+   342                      <       		STA		$3E00,X
+   343                      <       		INY
+   344                      <       		CPY		#04H
+   345                      <       		BNE		?L_ClrDpramLoopI
+   346                      <       		LDY		#00H
+   347                      <       		TXA
+   348                      <       		CLC
+   349                      <       		ADC		#0CH
+   350                      <       		TAX
+   351                      <       ?L_ClrDpramLoopI:		
+   352                      <       		INX
+   353                      <       		CPX		#80H
+   354                      <       		BNE		?L_ClrDpramLoop
+   355                      <       	.ENDM
+   356                      <       ;-----------------------------------------------------------------------------
+   357                      <       %F_Initinal_IO	.MACRO
+   358                      <       		LDA		#00000000b		
+   359                      <       		STA		P_IO_PortA_Dir
+   360                      <       		LDA		#00000000b		
+   361                      <       		STA		P_IO_PortA_Data	
+   362                      <       		
+   363                      <       		LDA		#0
+   364                      <       		STA		P_IO_PortB_Attrib
+   365                      <       		LDA		#00000011b		
+   366                      <       		STA		P_IO_PortB_Dir
+   367                      <       		LDA		#00000000b		
+   368                      <       		STA		P_IO_PortB_Data		;PB1蜂鸣器，PB0背光
+   369                      <       
+   370                      <       		LDA		#00H
+   371                      <       		STA		P_IO_PortC_Dir
+   372                      <       		LDA		#00000000b
+   373                      <       		STA		P_IO_PortC_Data	
+   374                      <       		
+   375                      <       		LDA		#00h
+   376                      <       		STA		P_IO_PortD_Attrib		
+   377                      <       		LDA		#00000000b		
+   378                      <       		STA		P_IO_PortD_Dir
+   379                      <       		STA		P_IOD_DIR_Map	
+   380                      <       		LDA		#00000000b
+   381                      <       		STA		P_IO_PortD_Data		
+   382                      <       		STA		R_PortD_Data_Buf
+   383                      <       
+   384                      <       		LDA		#00000000b			;PE0/PE1/PE2 全部作为按键输入
+   385                      <       		STA		P_IO_PortE_Dir
+   386                      <       		LDA		#00000000b			
+   387                      <       		STA		P_IO_PortE_Data		
+   388                      <       		
+   389                      <       		LDA		#00
+   390                      <       		STA		P_IO_Ctrl			;all as normal IO
+   391                      <       		.ENDM
+   392                      <       ;-----------------------------------------------------------------------------
+   393                      <       ; Clear watch dog
+   394                      <       %WatchDogClear	 .MACRO
+   395                      <       
+   396                      <       	   STA	   P_WDT_Flag_Clear
+   397                      <       
+   398                      <       	   .ENDM
+   399                      <       ;-----------------------------------------------------------------------------
+   400                      <       ; Macro Name:	%ClrPage0_60H_6FH
+   401                      <       ; Description:	Clear SRAM $60 ~ $7F
+   402                      <       ;-----------------------------------------------------------------------------	
+   403                      <       %ClrPage0_60H_6FH:	.MACRO
+   404                      <       
+   405                      <       		LDX		#0FH
+   406                      <       		LDA		#0
+   407                      <       		
+   408                      <       ?L_ClrLoop#:
+   409                      <       		STA		$60,X
+   410                      <       		DEX
+   411                      <       		BPL		?L_ClrLoop#	
+   412                      <       
+   413                      <       	.ENDM
+   414                      <       
+   415                      <       ;
+   416                      <       ;%EnableRR:		.MACRO	
+   417                      <       ;;RT=>PD4	RR=>PD3	
+   418                      <       ;		LDA		#D_Bit4+D_Bit5
+   419                      <       ;        STA		RFC_IO_Attrib
+   420                      <       ;		LDA		RB_IOD_Dir_temp
+   421                      <       ;		AND		#11000011b
+   422                      <       ;        ORA     #D_Bit5+D_Bit4+D_Bit3
+   423                      <       ;		STA		RFC_IO_Dir
+   424                      <       ;		LDA		RFC_IO_Data
+   425                      <       ;		ORA     #D_Bit2
+   426                      <       ;		STA     RFC_IO_Data
+   427                      <       ;		
+   428                      <       ;	.ENDM
+   429                      <       ;;------------------------
+   430                      <       ;%EnableRT:		.MACRO
+   431                      <       ;	
+   432                      <       ;		LDA		#D_Bit5+D_Bit3
+   433                      <       ;        STA		RFC_IO_Attrib
+   434                      <       ;		LDA		RB_IOD_Dir_temp
+   435                      <       ;		AND		#11000011b
+   436                      <       ;        ORA     #D_Bit5+D_Bit4+D_Bit3
+   437                      <       ;		STA		RFC_IO_Dir
+   438                      <       ;		LDA		RFC_IO_Data
+   439                      <       ;		ORA     #D_Bit2
+   440                      <       ;		STA     RFC_IO_Data
+   441                      <       ;		
+   442                      <       ;	.ENDM
+   443                      <       ;;===================================================
+   444                      <       ;;%EnableRR:		.MACRO	
+   445                      <       ;;;RT=>PD4	RR=>PD3	
+   446                      <       ;;;		LDA		RB_IOD_Dir_temp
+   447                      <       ;;;		LDA		#D_Bit3+D_Bit4
+   448                      <       ;;		LDA		#D_Bit4
+   449                      <       ;;        STA		RFC_IO_Attrib
+   450                      <       ;;		LDA		RB_IOD_Dir_temp
+   451                      <       ;;		AND		#11100001b
+   452                      <       ;;;        ORA     #D_Bit5+D_Bit4+D_Bit3
+   453                      <       ;;		ORA		#D_Bit4+D_Bit3
+   454                      <       ;;		STA		RFC_IO_Dir
+   455                      <       ;;		STA		RB_IOD_Dir_temp
+   456                      <       ;;		LDA		RFC_IO_Data
+   457                      <       ;;		AND		#11100011b
+   458                      <       ;;		ORA     #D_Bit2
+   459                      <       ;;		STA     RFC_IO_Data
+   460                      <       ;;		
+   461                      <       ;;	.ENDM
+   462                      <       ;;;------------------------
+   463                      <       ;;%EnableRT:		.MACRO
+   464                      <       ;;	
+   465                      <       ;;		LDA		#D_Bit3
+   466                      <       ;;;		LDA		#D_Bit4+D_Bit5
+   467                      <       ;;        STA		RFC_IO_Attrib
+   468                      <       ;;		LDA		RB_IOD_Dir_temp
+   469                      <       ;;		AND		#11100001b
+   470                      <       ;;        ORA     #D_Bit4+D_Bit3;+D_Bit5
+   471                      <       ;;		STA		RFC_IO_Dir
+   472                      <       ;;		STA		RB_IOD_Dir_temp
+   473                      <       ;;		LDA		RFC_IO_Data
+   474                      <       ;;		AND		#11100011b
+   475                      <       ;;		ORA     #D_Bit2
+   476                      <       ;;		STA     RFC_IO_Data
+   477                      <       ;;		
+   478                      <       ;;	.ENDM
+   479                      <       ;;------------------------
+   480                      <       ;%EnableRH:		.MACRO
+   481                      <       ;		LDA		#D_Bit3;+D_Bit5
+   482                      <       ;        STA		RFC_IO_Attrib
+   483                      <       ;        LDA		RB_IOD_Dir_temp
+   484                      <       ;        AND		#11100001b
+   485                      <       ;        ORA     #D_Bit4+D_Bit3;+D_Bit5
+   486                      <       ;		STA		RFC_IO_Dir
+   487                      <       ;		STA		RB_IOD_Dir_temp
+   488                      <       ;		LDA		RFC_IO_Data
+   489                      <       ;		AND		#11100011b
+   490                      <       ;		ORA     #D_Bit2
+   491                      <       ;		STA     RFC_IO_Data
+   492                      <       ;	.ENDM	
+   493                      <       ;==============================================
+   494                      <       %SetTimerData   .MACRO  c_data
+   495                      <       
+   496                      <               LDA     #.LOW.c_data
+   497                      <               STA     P_TIMER_TM0Data_LB
+   498                      <               LDA     #.HIGH.c_data
+   499                      <               STA     P_TIMER_TM0Data_HB
+   500                      <               STA     P_TIMER_TM0Load_Ctrl
+   501                      <               
+   502                      <       	.ENDM
+   503                      <       ;-----------------------------------------------------------------------------
+   504                      <       ; Macro Name:	%PushAll                                                        
+   505                      <       ; Description:	Push                                                          
+   506                      <       ;-----------------------------------------------------------------------------
+   507                      <       %PushAll:		.MACRO                                                            
+   508                      <       		PHP                                                                         
+   509                      <       		PHA                                                                         
+   510                      <       		TXA                                                                         
+   511                      <       		PHA                                                                         
+   512                      <       		TYA                                                                         
+   513                      <       		PHA                                                                         
+   514                      <                                                                              
+   515                      <       			.ENDM                                                                   
+   516                      <       ;-----------------------------------------------------------------------------
+   517                      <       ; Macro Name:	%PopAll                                                         
+   518                      <       ; Description:	Pop                                                           
+   519                      <       ;-----------------------------------------------------------------------------
+   520                      <       %PopAll:		.MACRO                                                            
+   521                      <                                                           
+   522                      <       		PLA                                                                         
+   523                      <       		TAY                                                                         
+   524                      <       		PLA                                                                         
+   525                      <       		TAX                                                                         
+   526                      <       		PLA                                                                         
+   527                      <       		PLP                                                                         
+   528                      <       			.ENDM	                                
+   529                      <       		
+   530                      <       ;==========================================================================
+   531                      <       LCDConvert		.MACRO  com,seg
+   532                      <       ;			DB	com*8+(seg/8)+00H,1<<(seg.AND.07H)
+   533                      <       ;			DB	(com*8+07H)-(seg/8),1<<(seg.AND.07H)	;LB25B
+   534                      <       ;			DB	com*4+(seg/8)+50H,1<<(seg.AND.07H)	;L11A\B
+   535                      <       ;			DB	com*6+(seg/8)+20H,1<<(seg.AND.07H)	;L31B
+   536                      <       ;LCDConvert:		.Macro	com,seg
+   537                      <       ;			DB	com*4+(seg/8)+A0H,1<<(seg.AND.07H)	;GPL10A
+   538                      <       			DB	com*10H+(seg/8)+00H,1<<(seg.AND.07H)	;GPL813P01;
+   539                      <       			
+   540                      <       			.ENDM
+   541                      <       			
+   542                      <       %LCD7S        .MACRO   i1c,i1s,i2c,i2s,i3c,i3s,i4c,i4s,i5c,i5s,i6c,i6s,i7c,i7s
+   543                      <                      LCDConvert    i1c,i1s
+   544                      <                      LCDConvert    i2c,i2s
+   545                      <                      LCDConvert    i3c,i3s
+   546                      <                      LCDConvert    i4c,i4s
+   547                      <                      LCDConvert    i5c,i5s
+   548                      <                      LCDConvert    i6c,i6s
+   549                      <                      LCDConvert    i7c,i7s
+   550                      <                      .ENDM
+   551                      <                      
+   552                      <       %LCD8S:        .MACRO   i1c,i1s,i2c,i2s,i3c,i3s,i4c,i4s,i5c,i5s,i6c,i6s,i7c,i7s,i8c,i8s
+   553                      <                      LCDConvert    i1c,i1s
+   554                      <                      LCDConvert    i2c,i2s
+   555                      <                      LCDConvert    i3c,i3s
+   556                      <                      LCDConvert    i4c,i4s
+   557                      <                      LCDConvert    i5c,i5s
+   558                      <                      LCDConvert    i6c,i6s
+   559                      <                      LCDConvert    i7c,i7s
+   560                      <       		       LCDConvert    i8c,i8s
+   561                      <                      .ENDM  
+   562                      <                    
+   563                      <       ;**********************************************************************
+   564                      <       %Define_IOPort:	.Macro
+   565                      <       			lda	#(PortCD0Output+PortCD1Output+PortCD2Output+PortCD3Output)
+   566                      <       			sta	P_00H_Port_Ctrl
+   567                      <       			lda	#03H		;D_PortCDScan
+   568                      <       			sta	P_03H_PortCD_Data
+   569                      <       			.ENDM	
+   570                      <       
+   571                      <       ;================================================================
+   572                      <       ;Kind   :Count Loop
+   573                      <       ;================================================================
+   574                      <       ;-------------------------------------------------------------------------
+   575                      <       %DJNZ:               .MACRO       Var,Lable    ;  !=0
+   576                      <                             DEC          Var
+   577                      <                             BNE          Lable
+   578                      <                            .ENDM
+   579                              .Include	KEY\KEY.inc
+   580                      <       
+   581                      <       ;===================================================
+   582                      <       ;			RAM Define
+   583                      <       ;====================================================
+   584                      <       .EXTERN		R_Set
+   585                      <       D_SetConver		equ	02h
+   586                      <       D_SetTimeHour	equ	04h
+   587                      <       D_SetTimeMin	equ	08h
+   588                      <       D_SetTimeMax	equ	10h
+   589                      <       
+   590                      <       ;D_SetAConver	equ	02h
+   591                      <       D_SetAlarmHour	equ	02h
+   592                      <       D_SetAlarmMin	equ	04h
+   593                      <       D_SetAlarmMax	equ	08h
+   594                      <       
+   595                      <       D_SetDateYear	equ	02h
+   596                      <       D_SetDateMonth	equ	04h
+   597                      <       D_SetDateDay	equ	08h
+   598                      <       D_SetDateMax	equ	10h
+   599                      <       
+   600                      <       D_SetHour	equ	02h
+   601                      <       D_SetMin	equ	04h
+   602                      <       D_SetMax	equ	08h
+   603                      <       
+   604                      <       
+   605                      <       .EXTERN		R_KeyFlag
+   606                      <       D_KeyTone		equ	01h
+   607                      <       D_EnableFastAdd	equ	02h		
+   608                      <       D_EnableAlarm	equ	04h
+   609                      <       D_EnableSnooze	equ	08h
+   610                      <       D_KeyRelDis		equ	10h
+   611                      <       D_ToneOn		equ	20h
+   612                      <       D_Alarming		equ	40h
+   613                      <       D_24Mode		equ	80h		;must for bit7/24mode
+   614                      <       	
+   615                      <       .EXTERN		INT_PlayPWM	
+   616                      <       .EXTERN		R_LEDFlag	
+   617                      <       D_LED_ON		equ		0x08
+   618                      <       
+   619                      <       .EXTERN		R_BLTime
+   620                      <       D_5SecBL			equ	10
+   621                      <       D_2SecBL			equ	4
+   622                      <       
+   623                      <       .EXTERN		R_KeyValue		
+   624                      <       .EXTERN		R_KeyTemp		
+   625                      <       ;.EXTERN		R_SpecFlag		
+   626                      <       	
+   627                      <       .EXTERN		R_SetBack					
+   628                      <       .EXTERN		R_OldKeyValue
+   629                      <       D_KeyFcClear		equ		0x01
+   630                      <       D_KeyAllTime		equ		0x02
+   631                      <       D_KeyLight			equ		0x04
+   632                      <       D_KeyUnused		equ		0x08
+   633                      <       .EXTERN		R_DebounceCnt	
+   634                      <       C_KeyDebounce		equ		2		;30ms 
+   635                      <       	
+   636                      <       .EXTERN		R_LEDTemp	
+   637                      <       .EXTERN		F_Check_LED
+   638                      <       
+   639                      <       	
+   640                      <       ;.EXTERN		R_SleepTime
+   641                      <       C_Sleep20Sec			equ 	40	;120/2=60sec
+   642                      <       	
+   643                      <       .EXTERN		R_LongKeyTime
+   644                      <       C_LongKey2Sec			equ		255
+   645                      <       C_FastAdd				equ		24		;1秒加8次
+   646                      <       	
+   647                      <       .EXTERN			R_KeyFlag1	
+   648                      <       D_TimeFlag			equ		01h
+   649                      <       D_Timering_Short	equ		02H
+   650                      <       D_NoKeyTone			equ		04H
+   651                      <       D_DC				equ		08H
+   652                      <       D_EnableSnooze1		equ		10h
+   653                      <       ;===================================================
+   654                      <       ;			Module Define
+   655                      <       ;====================================================
+   656                      <       .EXTERN	        F_KeyScan	
+   657                      <       .EXTERN			InitLED
+   658                      <       .EXTERN			F_PlayKeyTone
+   659                      <       .EXTERN			F_2Hz_Cnt
+   660                      <       .EXTERN			F_initSet
+   661                      <       
+   662                      <       .EXTERN			F_DC_Judge	
+   663                      <       
+   664                      <       .EXTERN		F_Judge_ToneIO	
+   665                      <       .EXTERN		F_backlightOpen
+   666                              .INCLUDE	Alarm\Alarm.inc
+   667                      <       
+   668                      <       ;===================================================
+   669                      <       ;			RAM Define
+   670                      <       ;====================================================
+   671                      <       .EXTERN		F_JudgeRFC
+   672                      <       .EXTERN		F_UpdateTHFromGXHTV4
+   673                      <       .EXTERN		F_LoadHistoryViewBuffers
+   674                      <       .EXTERN		F_ClearCurrentHistory
+   675                      <       .EXTERN		F_MoldAlarm128Hz
+   676                      <       .EXTERN		F_CheckLowBattery
+   677                      <       
+   678                      <       .EXTERN		CalculateRFC    
+   679                      <       
+   680                      <       .EXTERN		R_TempCH
+   681                      <       .EXTERN		R_TempCL
+   682                      <       .EXTERN		R_HUM
+   683                      <       	
+   684                      <       ;.EXTERN			R_PortD_Data_Buf
+   685                      <       ;===================================================
+   686                      <       ;			Module Define
+   687                      <       ;====================================================
+   688                      <       .EXTERN		R_KeyToneTm
+   689                      <       .EXTERN		R_SoundOn
+   690                      <       
+   691                      <       .EXTERN		R_HistoryClearTm
+   692                      <       .EXTERN		R_HistoryViewFlags
+   693                      <       D_HistoryViewValid	equ	0x01
+   694                      <       D_HistoryViewTempValid	equ	0x02
+   695                      <       
+   696                      <       .EXTERN		R_TrendFlags
+   697                      <       .EXTERN		R_TrendTempEqCnt
+   698                      <       .EXTERN		R_TrendHumEqCnt
+   699                      <       .EXTERN		R_BatteryFlags
+   700                      <       C_TrendEq60Min	equ	60
+   701                      <       D_BatteryLow		equ	0x01
+   702                      <       D_TempTrendUp		equ	0x02
+   703                      <       D_TempTrendDown	equ	0x04
+   704                      <       D_HumTrendUp		equ	0x08
+   705                      <       D_HumTrendDown	equ	0x10
+   706                      <       D_TempTrendRefresh	equ	0x20
+   707                      <       D_HumTrendRefresh	equ	0x40
+   708                      <       
+   709                      <       
+   710                      <       .EXTERN		R_SpecFlag	
+   711                      <       .EXTERN		R_TempMin_Sign
+   712                      <       .EXTERN		R_TempMax_Sign	
+   713                      <       D_TempHH			equ	0x40
+   714                      <       D_TempLL			equ	0x20
+   715                      <       D_Neg				equ 0x10	;负温度
+   716                      <       D_TF				equ 0x08	;华氏度
+   717                      <       D_HumHH				equ	0x04
+   718                      <       D_HumLL				equ	0x02
+   719                      <       .EXTERN		R_DispTemper_F	
+   720                      <       .EXTERN		R_MAXDispTemper_F
+   721                      <       .EXTERN		R_MINDispTemper_F	
+   722                      <       .EXTERN		R_DispTemper
+   723                      <       .EXTERN		R_TempMax          ; 最高温度记录(BCD码，带符号)
+   724                      <       .EXTERN		R_TempMin          ; 最低温度记录(BCD码，带符号)
+   725                      <       .EXTERN		R_DispHum		
+   726                      <       .EXTERN		R_HumMax       ; 最高湿度记录(BCD码，无符号)
+   727                      <       .EXTERN		R_HumMin       ; 最低湿度记录(BCD码，无符号)
+   728                      <       .EXTERN		R_TempFlag1		
+   729                      <       D_MaxTemp		equ	0x01
+   730                      <       D_MinTemp		equ	0x02
+   731                      <       
+   732                      <       ;.EXTERN		RFC_Process_Flag	
+   733                              ;.INCLUDE	RFC\RFC.inc
+   734                              ;==============================================================================
+   735                              ; Public declare area
+   736                              ;==============================================================================
+   737                              .PUBLIC			F_ResetRealTimeClock
+   738                              .PUBLIC			F_RealTimeClock
+   739                              .PUBLIC			F_ClearIncStatus
+   740                              .PUBLIC			F_ClearSecond
+   741                              .PUBLIC			DEC_YMDHMS
+   742                              .PUBLIC			INC_SEC	
+   743                              .PUBLIC			INC_MIN  
+   744                              .PUBLIC			INC_MIN1
+   745                              .PUBLIC			INC_MIN2
+   746                              .PUBLIC			INC_HR 
+   747                              .PUBLIC			INC_HR1
+   748                              .PUBLIC			INC_DAT 
+   749                              .PUBLIC			INC_HR2		;x for RAM, a for Max 
+   750                              .PUBLIC			INC_MON  
+   751                              .PUBLIC			INC_YER  
+   752                              .PUBLIC			MAXDCMP
+   753                              .PUBLIC			WEEKCAL
+   754                              .PUBLIC			R_TimeStatus
+   755                              .PUBLIC			RTC
+   756                              .PUBLIC			DATE
+   757                              .PUBLIC			TR01
+   758                              ;==========================================
+   759                              ; Constant define area
+   760                              ;==========================================
+   761                              ;YearMonthDate	        EQU	    1			 ;define year month date enable 		
+   762                              	
+   763                              ;------------------------------------------------------------------------------
+   764 00000083                     .PAGE0
+   765                              ;
+   766 00000083 FF FF FF            RTC		             .DS	 3
+   767                              	; RTC+0 --> Hour (BCD)
+   768                              	; RTC+1 --> Minute (BCD)
+   769                              	; RTC+2 --> Second (BCD)
+   770                              	;  -------------------------------------------
+   771                              	; |             | RTC+0   | RTC+1   | RTC+2   |
+   772                              	; |-------------|---------|---------|---------|
+   773                              	; | Description | Hour    | Minute  | Second  |
+   774                              	; |	            | 00 - 23 | 00 - 59 | 00 - 59 |        
+   775                              	; |		        | (BCD)   | (BCD)   | (BCD)   |         |
+   776                              	;  -------------------------------------------
+   777                              ;
+   778 00000086 FF FF FF            DATE	            .DS	    3
+   779                              	; DATE+0 --> 00-99(BCD) Year
+   780                              	; DATE+1 --> .7 = 1 --> 20xx (Year)
+   781                              	;		        = 0 --> 19xx (Year)
+   782                              	;	         .6 - .4 --> 00H - 06H --> SUN - SAT (Week)
+   783                              	;	         .3 - .0 --> 00H - 0BH --> JAN - DEC (Month)
+   784                              	; DATE+2 --> 01 - 31(BCD) Date
+   785                              ;
+   786 00000089 FF                  R_TimeStatus	    .DS	    1       ;(.7 reserved!!!)
+   787                              HalfSecToggle			EQU		01000000B
+   788                              AddSecondOnly			EQU		00100000B
+   789                              AddOthers				EQU		00010000B
+   790 0000008A FF                  TR00				.DS	    1
+   791 0000008B FF                  TR01				.DS		1
+   792 0000008C FF                  TR02		    	.DS		1
+   793 0000008D FF                  TR03				.DS		1
+   794                              ;------------------------------------------------------------------------------
+   795 0000E1F5                     .CODE
+   796                              ;==============================================================================
+   797 0000E1F5                     F_RealTimeClock:	;Level 1
+   798 0000E1F5 A9 40               	LDA	#HalfSecToggle
+   799 0000E1F7 45 89               	EOR	R_TimeStatus
+   800 0000E1F9 85 89               	STA	R_TimeStatus
+   801 0000E1FB 29 40               	AND	#HalfSecToggle
+   802 0000E1FD D0 2C               	BNE	L_Time99	; 0.5 second only!!!
+   803                              ;	1 second!!!
+   804 0000E1FF 20 CE E3            	JSR	INC_SEC	;Level 2  
+   805 0000E202 90 21               	BCC	L_OnlySEcAdd
+   806                              
+   807 0000E204 20 D3 E3            	JSR	INC_MIN	;Level 2
+   808 0000E207 90 18               	BCC	L_OnlyMinAdd
+   809                              	
+   810                              	
+   811 0000E209 20 E0 E3            	JSR	INC_HR	;Level 2
+   812                              	
+   813                              ;	IFDEF	YearMonthDate
+   814 0000E20C 90 13               	BCC	L_OnlyHourAdd
+   815 0000E20E 20 B9 E3            	JSR	INC_DAT	;Level 3
+   816 0000E211 90 08               	BCC	L_Time01
+   817 0000E213 20 87 E3            	JSR	INC_MON	;Level 2
+   818 0000E216 90 03               	BCC	L_Time01
+   819 0000E218 20 C5 E3            	JSR	INC_YER	;Level 2
+   820 0000E21B                     L_Time01:
+   821 0000E21B 20 55 E2            	JSR	WEEKCAL	;Level 3
+   822 0000E21E 20 1F E3            	JSR	MAXDCMP	;Level 3
+   823                              ;	ELSE
+   824                              ;	ENDIF
+   825 0000E221                     L_OnlyHourAdd:
+   826 0000E221                     L_OnlyMinAdd:	
+   827 0000E221 A9 10               	LDA	#AddOthers
+   828 0000E223 D0 02               	BNE	L_AddAll	;@JMP
+   829 0000E225                     L_OnlySEcAdd:
+   830 0000E225 A9 20               	LDA	#AddSecondOnly
+   831 0000E227                     L_AddAll:
+   832 0000E227 05 89               	ORA	R_TimeStatus
+   833 0000E229 85 89               	STA	R_TimeStatus
+   834 0000E22B                     L_Time99:
+   835 0000E22B 60                  	RTS
+   836                              ;
+   837                              ;------------------------------------------------------------------------------
+   838                              ;
+   839 0000E22C                     F_ClearIncStatus:
+   840 0000E22C A9 CF               	LDA	#(.NOT.(AddSecondOnly+AddOthers))
+   841 0000E22E 25 89               	AND	R_TimeStatus
+   842 0000E230 85 89               	STA	R_TimeStatus
+   843 0000E232 60                  	RTS
+   844                              ;
+   845                              ;------------------------------------------------------------------------------
+   846                              ;
+   847 0000E233                     F_ResetRealTimeClock:          ;开机显示初值(默认值)
+   848 0000E233 A9 00               	LDA	#00H
+   849 0000E235 85 83               	STA	RTC+0
+   850 0000E237 A9 00               	LDA	#00H
+   851 0000E239 85 84               	STA	RTC+1
+   852 0000E23B A9 00               	LDA	#00H		;test use
+   853 0000E23D 85 85               	STA	RTC+2	
+   854 0000E23F A9 10               	LDA	#AddOthers
+   855 0000E241 85 89               	STA	R_TimeStatus
+   856                              ;	IFDEF	YearMonthDate
+   857                              	; DATE+0 --> 00-99 (Year)
+   858                              	; DATE+1 --> .7 = 1 --> 20xx (Year)
+   859                              	;		= 0 --> 19xx (Year)
+   860                              	;	     .6 - .4 --> 00H - 06H --> SUM - SAT (Week)
+   861                              	;	     .3 - .0 --> 00H - 0BH --> JAN - DEC (Month)
+   862                              	; DATE+2 --> 01 - 31 (Date)
+   863 0000E243 A9 25               	LDA	#00100101B			; 2025-1-1 	;2(0010)4(0100)  (BCD8421)
+   864 0000E245 85 86               	STA	DATE+0
+   865 0000E247 A9 B0               	LDA	#10110000B			;1(20xx) 001(Mon) 0000(JAN)
+   866 0000E249 85 87               	STA	DATE+1
+   867                              ;	STA	R_LaZhuMonth
+   868 0000E24B A9 01               	LDA	#00000001B
+   869 0000E24D 85 88               	STA	DATE+2				;DATE+2 --> 01 - 31 (Date)
+   870                              ;	ELSE
+   871                              ;	ENDIF
+   872 0000E24F 60                  	RTS
+   873                              ;
+   874                              ;------------------------------------------------------------------------------
+   875 0000E250                     F_ClearSecond:
+   876 0000E250 A9 00               	LDA	#00
+   877 0000E252 85 85               	STA	RTC+2
+   878 0000E254 60                  	RTS
+   879                              ;	IFDEF	YearMonthDate
+   880                              ;------------------------------------------------------------------------------
+   881                              ; --- Week Calculate for Month ---
+   882                              ; *** Use TR00 ***
+   883                              ;	  TR01
+   884                              ;	  TR02 Temp Week
+   885                              ;         TR03
+   886                              ;
+   887 0000E255                     WEEKCAL:
+   888 0000E255 A5 87               	LDA	DATE+1		;;
+   889 0000E257 30 0D               	BMI	WEC_00		;;
+   890 0000E259 A9 00               	LDA	#0
+   891 0000E25B 85 8C               	STA	TR02		; 1/1/1900 as Sun
+   892 0000E25D A5 86               	LDA	DATE
+   893 0000E25F D0 09               	BNE	WEC_02
+   894 0000E261 A9 01               	LDA	#1		; 1/1/1900 Mon
+   895 0000E263 4C 68 E2            	JMP	WEC_01
+   896 0000E266                     WEC_00:
+   897 0000E266 A9 06               	LDA	#6		; 1/1/2000 Sat
+   898 0000E268                     WEC_01:
+   899 0000E268 85 8C               	STA	TR02
+   900 0000E26A                     WEC_02:
+   901 0000E26A A5 86               	LDA	DATE		; XXL_WeekX
+   902 0000E26C 20 35 E4            	JSR	AROR
+   903 0000E26F 85 8A               	STA	TR00
+   904 0000E271                     WEC_03:
+   905 0000E271 C6 8A               	DEC	TR00
+   906 0000E273 30 15               	BMI	WEC_04
+   907 0000E275 A5 8A               	LDA	TR00
+   908 0000E277 29 01               	AND	#00000001B
+   909 0000E279 D0 05               	BNE	L_Week01
+   910 0000E27B A9 06               	LDA	#06H
+   911 0000E27D 4C 82 E2            	JMP	L_Week02
+   912 0000E280                     L_Week01:
+   913 0000E280 A9 05               	LDA	#05H
+   914 0000E282                     L_Week02:
+   915 0000E282 85 8B               	STA	TR01
+   916 0000E284 20 0D E3            	JSR	WADDUP
+   917 0000E287 4C 71 E2            	JMP	WEC_03
+   918                              ;
+   919 0000E28A                     WEC_04:
+   920 0000E28A A5 86               	LDA	DATE		; XXX?
+   921 0000E28C 29 0F               	AND	#00001111B
+   922 0000E28E 85 8A               	STA	TR00
+   923 0000E290                     WEC_05:
+   924 0000E290 C6 8A               	DEC	TR00
+   925 0000E292 30 27               	BMI	WEC_06
+   926 0000E294 A5 86               	LDA	DATE
+   927 0000E296 29 10               	AND	#00010000B
+   928 0000E298 D0 05               	BNE	L_Week001
+   929 0000E29A A9 00               	LDA	#00
+   930 0000E29C 4C A1 E2            	JMP	L_Week002
+   931 0000E29F                     L_Week001:
+   932 0000E29F A9 02               	LDA	#02
+   933 0000E2A1                     L_Week002:
+   934 0000E2A1 85 8D               	STA	TR03
+   935 0000E2A3 A5 8A               	LDA	TR00
+   936 0000E2A5 29 03               	AND	#00000011B
+   937 0000E2A7 38                  	SEC
+   938 0000E2A8 E5 8D               	SBC	TR03
+   939 0000E2AA F0 05               	BEQ	L_Week003
+   940 0000E2AC A9 01               	LDA	#1
+   941 0000E2AE 4C B3 E2            	JMP	L_Week004
+   942 0000E2B1                     L_Week003:
+   943 0000E2B1 A9 02               	LDA	#2
+   944 0000E2B3                     L_Week004:
+   945 0000E2B3 85 8B               	STA	TR01
+   946 0000E2B5 20 0D E3            	JSR	WADDUP
+   947 0000E2B8 4C 90 E2            	JMP	WEC_05
+   948                              ;
+   949 0000E2BB                     WEC_06: 			; ?/XX
+   950 0000E2BB A5 87               	LDA	DATE+1
+   951 0000E2BD 29 0F               	AND	#00001111B
+   952 0000E2BF 85 8A               	STA	TR00
+   953                              ;
+   954 0000E2C1                     WEC_07:
+   955 0000E2C1 C6 8A               	DEC	TR00
+   956 0000E2C3 30 1A               	BMI	WEC_08
+   957 0000E2C5 A5 8A               	LDA	TR00
+   958 0000E2C7 20 3C E3            	JSR	MONCAL2
+   959 0000E2CA 29 0F               	AND	#00001111B
+   960 0000E2CC 18                  	CLC
+   961 0000E2CD 69 08               	ADC	#08H
+   962 0000E2CF C9 0F               	CMP	#0FH
+   963 0000E2D1 B0 02               	BCS	L_Week0001
+   964 0000E2D3 69 0A               	ADC	#0AH
+   965 0000E2D5                     L_Week0001:
+   966 0000E2D5 29 0F               	AND	#00001111B
+   967 0000E2D7 85 8B               	STA	TR01
+   968 0000E2D9 20 0D E3            	JSR	WADDUP
+   969 0000E2DC 4C C1 E2            	JMP	WEC_07
+   970                              ;
+   971 0000E2DF                     WEC_08: 			; X/??
+   972                              ;	LDA	#01H
+   973                              ;	STA	TR01
+   974 0000E2DF A5 88               	LDA	DATE+2
+   975 0000E2E1 85 8B               	STA	TR01
+   976 0000E2E3 A2 8B               	LDX	#TR01
+   977 0000E2E5                     WEC_09:
+   978 0000E2E5 A5 8B               	LDA	TR01
+   979                              ;	CMP	#7
+   980 0000E2E7 C9 08               	CMP	#8
+   981 0000E2E9 90 0A               	BCC	L_Week00001
+   982 0000E2EB A9 93               	LDA	#93H
+   983 0000E2ED 85 8A               	STA	TR00
+   984 0000E2EF 20 12 E4            	JSR	ADC_RT
+   985 0000E2F2 4C E5 E2            	JMP	WEC_09
+   986 0000E2F5                     L_Week00001:
+   987 0000E2F5 C6 8B               	DEC	TR01
+   988 0000E2F7 20 0D E3            	JSR	WADDUP
+   989 0000E2FA A5 8C               	LDA	TR02
+   990 0000E2FC 2A                  	ROL	A
+   991 0000E2FD 2A                  	ROL	A
+   992 0000E2FE 2A                  	ROL	A
+   993 0000E2FF 2A                  	ROL	A
+   994 0000E300 29 70               	AND	#01110000B
+   995 0000E302 85 8C               	STA	TR02
+   996 0000E304 A5 87               	LDA	DATE+1
+   997 0000E306 29 8F               	AND	#10001111B
+   998 0000E308 05 8C               	ORA	TR02
+   999 0000E30A 85 87               	STA	DATE+1
+  1000 0000E30C 60                  	RTS
+  1001                              
+  1002                              ;
+  1003                              ; ** TR02 = TR02 + TR01 **
+  1004                              ; ** TR02 Range 0 - 6	**
+  1005 0000E30D                     WADDUP:
+  1006 0000E30D A5 8C               	LDA	TR02
+  1007 0000E30F 29 0F               	AND	#00001111B
+  1008 0000E311 18                  	CLC
+  1009 0000E312 65 8B               	ADC	TR01
+  1010 0000E314 C9 07               	CMP	#7
+  1011 0000E316 90 04               	BCC	L_WeekAdd01
+  1012 0000E318 69 08               	ADC	#8		; +8 +C
+  1013 0000E31A 29 0F               	AND	#00001111B
+  1014 0000E31C                     L_WeekAdd01:
+  1015 0000E31C 85 8C               	STA	TR02
+  1016 0000E31E 60                  	RTS
+  1017                              ;
+  1018                              ;----------------------------------------------------------
+  1019                              ; --- Max. Date Compare ---
+  1020                              ;
+  1021 0000E31F                     MAXDCMP:
+  1022 0000E31F 20 3A E3            	JSR	MONCAL
+  1023 0000E322 C5 88               	CMP	DATE+2
+  1024 0000E324 10 02               	BPL	L_Maxday01
+  1025 0000E326 85 88               	STA	DATE+2
+  1026 0000E328                     L_Maxday01:
+  1027 0000E328 60                  	RTS
+  1028                              
+  1029                              ;----------------------------------------------------------
+  1030                              ; --- Max. Date of Month ---
+  1031                              ; *** Use TR01 ***
+  1032                              ; *** RTS Max. Date = TR01 & A ***
+  1033 0000E329                     MONCAL1:
+  1034 0000E329 A5 89               	LDA	R_TimeStatus
+  1035 0000E32B 10 0D               	BPL	MONCAL		; /DECF
+  1036                              ;
+  1037 0000E32D A5 87               	LDA	DATE+1
+  1038 0000E32F 29 0F               	AND	#00001111B
+  1039 0000E331 85 8B               	STA	TR01
+  1040 0000E333 C6 8B               	DEC	TR01
+  1041 0000E335 A5 8B               	LDA	TR01
+  1042 0000E337 4C 40 E3            	JMP	MONCAL3
+  1043                              ;---------------------------
+  1044 0000E33A                     MONCAL:
+  1045 0000E33A A5 87               	LDA	DATE+1
+  1046 0000E33C                     MONCAL2:
+  1047 0000E33C 29 0F               	AND	#00001111B
+  1048 0000E33E 85 8B               	STA	TR01
+  1049 0000E340                     MONCAL3:
+  1050 0000E340 C9 01               	CMP	#1
+  1051 0000E342 F0 17               	BEQ	L_Month20		; Feb
+  1052                              ;
+  1053 0000E344 E6 8B               	INC	TR01
+  1054 0000E346 A5 8B               	LDA	TR01
+  1055 0000E348 29 08               	AND	#00001000B
+  1056 0000E34A F0 06               	BEQ	L_Month07
+  1057 0000E34C A5 8B               	LDA	TR01
+  1058 0000E34E 49 01               	EOR	#1
+  1059 0000E350 85 8B               	STA	TR01
+  1060 0000E352                     L_Month07:
+  1061 0000E352 A5 8B               	LDA	TR01
+  1062 0000E354 29 01               	AND	#00000001B
+  1063 0000E356 09 30               	ORA	#00110000B	; 3X
+  1064 0000E358 4C 84 E3            	JMP	L_Month25
+  1065                              ;
+  1066 0000E35B                     L_Month20:
+  1067 0000E35B A5 86               	LDA	DATE
+  1068 0000E35D D0 04               	BNE	L_Month26
+  1069 0000E35F A5 87               	LDA	DATE+1		;;
+  1070 0000E361 10 1A               	BPL	L_Month22A		; 1990 FEB
+  1071 0000E363                     L_Month26:
+  1072 0000E363 A5 86               	LDA	DATE
+  1073 0000E365 29 10               	AND	#00010000B
+  1074 0000E367 D0 07               	BNE	L_Month21
+  1075 0000E369 A9 00               	LDA	#00
+  1076 0000E36B 85 8B               	STA	TR01
+  1077 0000E36D 4C 74 E3            	JMP	L_Month22
+  1078 0000E370                     L_Month21:
+  1079 0000E370 A9 02               	LDA	#02
+  1080 0000E372 85 8B               	STA	TR01
+  1081 0000E374                     L_Month22:
+  1082 0000E374 A5 86               	LDA	DATE
+  1083 0000E376 29 03               	AND	#00000011B
+  1084 0000E378 38                  	SEC
+  1085 0000E379 E5 8B               	SBC	TR01
+  1086 0000E37B F0 05               	BEQ	L_Month23		; 29
+  1087 0000E37D                     L_Month22A:
+  1088 0000E37D A9 28               	LDA	#28H		; 28
+  1089 0000E37F 4C 84 E3            	JMP	L_Month25
+  1090 0000E382                     L_Month23:
+  1091 0000E382 A9 29               	LDA	#29H
+  1092 0000E384                     L_Month25:
+  1093 0000E384 85 8B               	STA	TR01
+  1094 0000E386 60                  	RTS
+  1095                              
+  1096                              ;----------------------------------------------------------
+  1097                              ; Use:	TR00 - Min
+  1098                              ;	TR01 - Max
+  1099                              ;	Overflow RTS CY=1
+  1100 0000E387                     INC_MON:
+  1101 0000E387 A5 87               	LDA	DATE+1
+  1102 0000E389 29 0F               	AND	#00001111B
+  1103 0000E38B 85 8A               	STA	TR00
+  1104 0000E38D A5 87               	LDA	DATE+1
+  1105 0000E38F 29 F0               	AND	#11110000B
+  1106 0000E391 85 87               	STA	DATE+1
+  1107 0000E393 A5 89               	LDA	R_TimeStatus
+  1108 0000E395 30 0E               	BMI	INC_MON3
+  1109 0000E397 E6 8A               	INC	TR00
+  1110 0000E399 A5 8A               	LDA	TR00
+  1111 0000E39B C9 0C               	CMP	#0CH
+  1112 0000E39D B0 03               	BCS	INC_M01
+  1113 0000E39F 4C A9 E3            	JMP	INC_M04
+  1114 0000E3A2                     INC_M01:
+  1115 0000E3A2 4C B7 E3            	JMP	INC_M03 	; = JAN
+  1116 0000E3A5                     INC_MON3:
+  1117 0000E3A5 C6 8A               	DEC	TR00
+  1118 0000E3A7 30 08               	BMI	INC_M02
+  1119 0000E3A9                     INC_M04:
+  1120 0000E3A9 A5 8A               	LDA	TR00
+  1121 0000E3AB 05 87               	ORA	DATE+1
+  1122 0000E3AD 85 87               	STA	DATE+1
+  1123 0000E3AF 18                  	CLC
+  1124 0000E3B0 60                  	RTS
+  1125 0000E3B1                     INC_M02:			; = DEC
+  1126 0000E3B1 A9 0B               	LDA	#0BH
+  1127 0000E3B3 05 87               	ORA	DATE+1
+  1128 0000E3B5 85 87               	STA	DATE+1
+  1129 0000E3B7                     INC_M03:
+  1130 0000E3B7 38                  	SEC
+  1131 0000E3B8 60                  	RTS
+  1132                              ;
+  1133 0000E3B9                     INC_DAT:
+  1134 0000E3B9 A2 88               	LDX	#DATE+2
+  1135 0000E3BB 20 3A E3            	JSR	MONCAL
+  1136 0000E3BE                     INC_DAT1:
+  1137 0000E3BE A9 01               	LDA	#1
+  1138 0000E3C0 85 8A               	STA	TR00
+  1139 0000E3C2 4C E9 E3            	JMP	INC_DET
+  1140                              ;
+  1141 0000E3C5                     INC_YER:
+  1142 0000E3C5 A2 86               	LDX	#DATE
+  1143 0000E3C7 A9 99               	LDA	#99H
+  1144 0000E3C9 85 8B               	STA	TR01
+  1145 0000E3CB 4C D9 E3            	JMP	INC_MIN2
+  1146                              ;	ELSE
+  1147                              ;	ENDIF
+  1148                              ;
+  1149 0000E3CE                     INC_SEC:
+  1150 0000E3CE A2 85               	LDX	#RTC+2   ;second
+  1151 0000E3D0 4C D5 E3            	JMP	INC_MIN1
+  1152 0000E3D3                     INC_MIN:
+  1153 0000E3D3 A2 84               	LDX	#RTC+1   ;Minute
+  1154 0000E3D5                     INC_MIN1:
+  1155 0000E3D5 A9 59               	LDA	#59H
+  1156 0000E3D7 85 8B               	STA	TR01
+  1157 0000E3D9                     INC_MIN2:
+  1158 0000E3D9 A9 00               	LDA	#00
+  1159 0000E3DB 85 8A               	STA	TR00
+  1160 0000E3DD 4C E9 E3            	JMP	INC_DET
+  1161                              ;
+  1162 0000E3E0                     INC_HR:
+  1163 0000E3E0 A2 83               	LDX	#RTC+0
+  1164 0000E3E2                     INC_HR1:
+  1165 0000E3E2 A9 23               	LDA	#23H
+  1166 0000E3E4                     INC_HR2:
+  1167 0000E3E4 85 8B               	STA	TR01
+  1168 0000E3E6 4C D9 E3            	JMP	INC_MIN2
+  1169 0000E3E9                     INC_DET:
+  1170 0000E3E9 A5 89               	LDA	R_TimeStatus
+  1171 0000E3EB 30 13               	BMI	DEC_DET
+  1172 0000E3ED B5 00               	LDA	0,X
+  1173 0000E3EF C5 8B               	CMP	TR01
+  1174 0000E3F1 B0 07               	BCS	INC_D01
+  1175 0000E3F3 A9 01               	LDA	#01
+  1176 0000E3F5 85 8A               	STA	TR00
+  1177 0000E3F7 4C 12 E4            	JMP	ADC_RT
+  1178 0000E3FA                     INC_D01:
+  1179 0000E3FA A5 8A               	LDA	TR00
+  1180 0000E3FC                     INC_D02:
+  1181 0000E3FC 95 00               	STA	0,X
+  1182 0000E3FE 38                  	SEC
+  1183 0000E3FF 60                  	RTS
+  1184                              ;
+  1185 0000E400                     DEC_DET:
+  1186 0000E400 B5 00               	LDA	0,X
+  1187 0000E402 C5 8A               	CMP	TR00
+  1188 0000E404 F0 07               	BEQ	DEC_D01
+  1189 0000E406 A9 99               	LDA	#99H
+  1190 0000E408 85 8A               	STA	TR00
+  1191 0000E40A 4C 12 E4            	JMP	ADC_RT
+  1192 0000E40D                     DEC_D01:
+  1193 0000E40D A5 8B               	LDA	TR01
+  1194 0000E40F 4C FC E3            	JMP	INC_D02
+  1195                              ;
+  1196                              ; Use:	TR00 - variable
+  1197                              ;	TR01 - (X)
+  1198                              ;	(X) = TR01+TR00
+  1199 0000E412                     ADC_RT:
+  1200 0000E412 18                  	CLC
+  1201 0000E413 B5 00               	LDA	0,X
+  1202 0000E415 85 8B               	STA	TR01
+  1203 0000E417 29 0F               	AND	#00001111B
+  1204 0000E419 65 8A               	ADC	TR00
+  1205 0000E41B 69 06               	ADC	#6
+  1206 0000E41D 45 8A               	EOR	TR00
+  1207 0000E41F 29 F0               	AND	#11110000B
+  1208 0000E421 F0 02               	BEQ	L_TimeAdd01
+  1209 0000E423 A9 06               	LDA	#6
+  1210 0000E425                     L_TimeAdd01:
+  1211 0000E425 65 8A               	ADC	TR00
+  1212 0000E427 65 8B               	ADC	TR01
+  1213 0000E429 B0 04               	BCS	L_TimeAdd02
+  1214 0000E42B C9 9A               	CMP	#9AH
+  1215 0000E42D 90 02               	BCC	L_TimeAdd03
+  1216 0000E42F                     L_TimeAdd02:
+  1217 0000E42F 69 5F               	ADC	#05FH
+  1218 0000E431                     L_TimeAdd03:
+  1219 0000E431 95 00               	STA	0,X
+  1220 0000E433 18                  	CLC
+  1221 0000E434 60                  	RTS
+  1222                              ;
+  1223                              ;	A >> 4
+  1224 0000E435                     AROR:
+  1225 0000E435 6A                  		ROR	A
+  1226 0000E436 6A                  		ROR	A
+  1227 0000E437 6A                  		ROR	A
+  1228 0000E438 6A                  		ROR	A
+  1229 0000E439 29 0F               		AND	#0FH
+  1230 0000E43B 60                  		RTS
+  1231                              ;
+  1232                              ;	A << 4
+  1233 0000E43C                     AROL:
+  1234 0000E43C 2A                  		ROL	A
+  1235 0000E43D 2A                  		ROL	A
+  1236 0000E43E 2A                  		ROL	A
+  1237 0000E43F 2A                  		ROL	A
+  1238 0000E440 29 F0               		AND	#F0H
+  1239 0000E442 60                  		RTS
+  1240                              ;
+  1241                              ;------------------------------------------------------------------------------
+  1242                              ;
+  1243                              ;;;TR00 store Down value, TR00 store max value.
+  1244 0000E443                     DEC_YMDHMS:				;input value for A,  max value for X
+  1245 0000E443 85 8A               			STA	TR00
+  1246 0000E445 8A                  			TXA	
+  1247 0000E446 85 8B               			STA	TR01
+  1248 0000E448 20 4E E4            			JSR	DEC_COM
+  1249 0000E44B A5 8A               			LDA	TR00
+  1250 0000E44D 60                  			RTS	
+  1251 0000E44E                     		DEC_COM:
+  1252 0000E44E 38                  			SEC
+  1253 0000E44F A5 8A               			LDA	TR00
+  1254 0000E451 E9 01               			SBC	#01
+  1255 0000E453 90 10               			BCC	DEC_COM_H	;if 
+  1256 0000E455 85 8A               			STA	TR00
+  1257 0000E457 29 0F               			AND	#0FH
+  1258 0000E459 C9 0F               			CMP	#0FH
+  1259 0000E45B F0 01               			BEQ	End_DEC_COM
+  1260 0000E45D 60                  			RTS
+  1261 0000E45E                     		End_DEC_COM:
+  1262 0000E45E A5 8A               			LDA	TR00
+  1263 0000E460 29 F9               			AND	#0F9H	;low set for 9
+  1264 0000E462 85 8A               			STA	TR00
+  1265 0000E464 60                  			RTS
+  1266 0000E465                     		DEC_COM_H:
+  1267 0000E465 A5 8B               			LDA	TR01
+  1268 0000E467 85 8A               			STA	TR00
+  1269 0000E469 60                  			RTS
+  1270                              .END	
+0 Error(s), 0 Warning(s).
+

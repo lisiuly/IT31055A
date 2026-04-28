@@ -1,0 +1,805 @@
+        Generalplus 6502 Assembler - Version 1.7.1.0  
+              Listing File Has Been Relocated
+
+     1                              ;==================================================================================
+     2                              ; Name                  : D_I2C.asm
+     3                              ; Applied Body          : GPL813X
+     4                              ; Programmer            : 
+     5                              ; Description           : 模拟IIC通讯(发送端)
+     6                              ; History version       : 
+     7                              ;==================================================================================
+     8                              ;==========================================
+     9                              ; Compiler parameter define
+    10                              ;==========================================
+    11                              .SYNTAX 6502
+    12                              .LINKLIST
+    13                              .SYMBOLS
+    14                              ;==========================================
+    15                              ; Include file area
+    16                              ;==========================================
+    17                              .INCLUDE 	GPL813x.inc
+    18                      <       	.IFDEF		GPL813_SERIES
+    19                      <       
+    20                      <       ;---------------------------------
+    21                      <       GPL813P01Cx		.EQU		1
+    22                      <       ;---------------------------------
+    23                      <       
+    24                      <       .IFNDEF GPL813X_Body_inc
+    25                      <       GPL813X_Body_inc:   .EQU    1
+    26                      <       ;==================================================================================
+    27                      <       ; The information contained herein is the exclusive property of
+    28                      <       ; Generalplus Technology Co. And shall not be distributed, reproduced,
+    29                      <       ; or disclosed in whole in part without prior written permission.
+    30                      <       ;       (C) COPYRIGHT 2017   Generalplus TECHNOLOGY CO.                            
+    31                      <       ;                   ALL RIGHTS RESERVED
+    32                      <       ; The entire notice above must be reproduced on all authorized copies.
+    33                      <       ;==================================================================================
+    34                      <       ;==================================================================================
+    35                      <       ; Program Name: GPL813 series register declare
+    36                      <       ; Applied body: GPL813 series
+    37                      <       ; Programmer  : KenLiu
+    38                      <       ; Description : 
+    39                      <       ;             : 
+    40                      <       ; History version
+    41                      <       ; Rev #       Date          Who            Comments
+    42                      <       ; -------  -----------    --------         ----------------------------------------
+    43                      <       ;==================================================================================
+    44                      <       ;==================================================================================
+    45                      <       
+    46                      <       		.IFNDEF	GPL813P01Ax
+    47                      <       		GPL813P01Ax: 	.EQU		0
+    48                      <       		.ENDIF
+    49                      <       		.IFNDEF	GPL813P01Bx
+    50                      <       		GPL813P01Bx: 	.EQU		0
+    51                      <       		.ENDIF
+    52                      <       		.IFNDEF	GPL813P01Cx
+    53                      <       		GPL813P01Cx: 	.EQU		0
+    54                      <       		.ENDIF
+    55                      <        	 
+    56                      <       .IF (GPL813P01Ax)
+    57                      <       GPL813X		.EQU		1
+    58                      <       .ENDIF
+    59                      <       .IF (GPL813P01Bx)
+    60                      <       GPL813X		.EQU		1
+    61                      <       .ENDIF
+    62                      <       .IF (GPL813P01Cx)
+    63                      <       GPL813X		.EQU		1
+    64                      <       .ENDIF
+    65                      <       			.IFDEF	GPL813X
+    66 000000BE             <       		.PAGE0
+    67                      <             
+    68                      <       ;===================  IO Register  ===================
+    69                      <       P_IO_PortA_Dir:     		.EQU	$00
+    70                      <       P_IO_PortA_Data:			.EQU	$02
+    71                      <       		
+    72                      <       P_IO_PortB_Dir:				.EQU	$10
+    73                      <       P_IO_PortB_Data:			.EQU	$12	
+    74                      <       P_IO_PortB_Attrib:			.EQU	$14
+    75                      <       
+    76                      <       P_IO_PortC_Dir:     		.EQU	$01
+    77                      <       P_IO_PortC_Data:			.EQU	$05
+    78                      <       P_IO_PortE_Data:     		.EQU	$03
+    79                      <       P_IO_PortE_DataLatch:		.EQU	$04
+    80                      <       
+    81                      <       P_IO_Ctrl:    			    .EQU	$06
+    82                      <       P_IO_PortE_Dir:				.EQU	$0B
+    83                      <       P_IO_PortD_Attrib			.EQU	$15
+    84                      <       P_IO_PortD_Dir				.EQU	$11
+    85                      <       P_IO_PortD_Data				.EQU	$13
+    86                      <       
+    87                      <       ;==============  Sleep/Wakeup Register  ==============
+    88                      <       P_WAKEUP_Ctrl:			    .EQU	$08
+    89                      <        D_WakeupTimer1:				.EQU	00100000B
+    90                      <        D_WakeupTimer0:				.EQU	00010000B
+    91                      <        D_WakeupTMBB:					.EQU	00001000B
+    92                      <        D_Wakeup128Hz:					.EQU	00000100B
+    93                      <        D_WakeupTMBA:					.EQU	00000010B
+    94                      <        D_WakeupKey:					.EQU	00000001B
+    95                      <        
+    96                      <       P_SYSTEM_Ctrl:			    .EQU	$09
+    97                      <       
+    98                      <       ;=================  Timer Register  ==================
+    99                      <       P_TIMER_TimeBase_Sel:		.EQU	$0A
+   100                      <       P_TIMER_Timer0_Ctrl:		.EQU	$22
+   101                      <        D_TimerEn:						.EQU	10000000B
+   102                      <        D_TimerRiseEdge:				.EQU	00000000B
+   103                      <        D_TimerFallEdge:				.EQU	01000000B
+   104                      <        D_TimerSrcExtA:				.EQU	00000000B
+   105                      <        D_TimerSrcExtA2:				.EQU	00100000B
+   106                      <        D_TimerSrcA_HF:				.EQU	00000000B
+   107                      <        D_TimerSrcA_HFDIV:				.EQU	00000001B
+   108                      <        D_TimerSrcA_EXT:				.EQU	00000010B
+   109                      <        D_TimerSrcA_VDD:				.EQU	00000011B
+   110                      <        D_TimerSrcB_LF:				.EQU	00000000B
+   111                      <        D_TimerSrcB_TMX:				.EQU	00000100B
+   112                      <        D_TimerSrcB_EXTA:				.EQU	00001000B
+   113                      <        D_TimerSrcB_VDD:				.EQU	00001100B
+   114                      <       P_TIMER_TM0Data_LB:			.EQU	$20
+   115                      <       P_TIMER_TM0Data_HB:			.EQU	$21
+   116                      <       P_TIMER_TM0Load_Ctrl:		.EQU	$23
+   117                      <       
+   118                      <       P_TIMER_TM1Data:			.EQU	$25
+   119                      <       P_TIMER_Timer1_Ctrl:		.EQU	$26
+   120                      <        D_Timer1En:					.EQU	10000000B
+   121                      <        D_Timer1_LSCK:					.EQU	00000000B
+   122                      <        D_Timer1_TMBB:					.EQU	00000001B 
+   123                      <        D_Timer1_HSCK:					.EQU	00000010B 
+   124                      <        D_Timer1_HFDIV:				.EQU	00000011B
+   125                      <       P_TIMER_TM1Load_Ctrl:		.EQU	$27
+   126                      <       
+   127                      <       ;==============  CPU & Clock Register  ===============
+   128                      <       P_CLK_CPU_Ctrl:				.EQU	$18
+   129                      <        D_RCHF_Msk:					.EQU	11100000B
+   130                      <        D_RCHF225K:					.EQU	00000000B;225k
+   131                      <        D_RCHF500K:					.EQU	01000000B;500k
+   132                      <        D_RCHF1800K:					.EQU	10000000B;1800k
+   133                      <        D_RCHF1000K:					.EQU	11000000B;1000k
+   134                      <        D_RCHF4000K:					.EQU	00100000B;4000k
+   135                      <        
+   136                      <        D_CPU_Msk:						.EQU	00000111B
+   137                      <        D_CPU_HF:						.EQU	00000000B;HF
+   138                      <        D_CPU_HF2:						.EQU	00000001B;HF/2
+   139                      <        D_CPU_HF4:						.EQU	00000010B;HF/4
+   140                      <        D_CPU_HF8:						.EQU	00000011B;HF/8
+   141                      <        D_CPU_HF16:					.EQU	00000100B;HF/16
+   142                      <       P_CLK_HFDIV_Ctrl:			.EQU	$1A
+   143                      <       P_CLK_32768_En:				.EQU	$0C
+   144                      <        D_LFEnable:					.EQU	00000000B 
+   145                      <        D_LFDisable:					.EQU	10000000B
+   146                      <        D_X32K_WEAK:					.EQU	00000100B
+   147                      <        D_X32K_STRO:					.EQU	00000010B
+   148                      <        D_CAP_EN:						.EQU	00000001B ;With internal CAP
+   149                      <        D_CAP_DIS:						.EQU	00000000B ;With external CAP
+   150                      <       ; D_256TMX_En:                   .EQU	00100000B
+   151                      <       
+   152                      <       ;=================  INT/NMI Register  ================
+   153                      <       P_INT_Ctrl:					.EQU	$0D
+   154                      <        D_IntMask:						.EQU	11111111B
+   155                      <        D_Ext2Int:						.EQU	10000000B
+   156                      <        D_LvdInt:						.EQU	01000000B
+   157                      <        D_Timer0Int:					.EQU	00100000B
+   158                      <        D_TMBBInt:						.EQU	00010000B
+   159                      <        D_TMBAInt:						.EQU	00001000B
+   160                      <        D_128HzInt:					.EQU	00000100B
+   161                      <        D_2KHzInt:						.EQU	00000010B
+   162                      <        D_ExtInt:						.EQU	00000001B
+   163                      <        
+   164                      <       P_INT_2KHz_Clear:			.EQU	$41
+   165                      <       P_INT_128Hz_Clear:			.EQU	$42
+   166                      <       P_INT_TimeBaseA_Clear:		.EQU	$43
+   167                      <       P_INT_TimeBaseB_Clear:		.EQU	$44
+   168                      <       
+   169                      <       P_INT_Timer0_Clear:			.EQU	$45
+   170                      <       P_INT_Ext_Clear:			.EQU	$40
+   171                      <       
+   172                      <       P_INT_Ctrl2:				.EQU	$2D
+   173                      <        D_Int2Mask:             		.EQU	00000011B
+   174                      <        D_Timer1Int:    				.EQU	00000001B
+   175                      <       P_INT_Ext2_Clear:			.EQU	$47			
+   176                      <       P_INT_Timer1_Clear:			.EQU	$48
+   177                      <       
+   178                      <       ;===================  LCD Register  ==================
+   179                      <       P_LCD_Ctrl:					.EQU	$07
+   180                      <        D_LcdConfigMask:       		.EQU	11111101B
+   181                      <        D_Duty_1_8:					.EQU	10001000B
+   182                      <        D_Duty_1_6:					.EQU	11001000B
+   183                      <        D_Duty_1_5:					.EQU	00000100B
+   184                      <        D_Duty_1_4:   					.EQU	01000100B
+   185                      <        D_Duty_1_3:					.EQU	10000100B
+   186                      <        
+   187                      <        D_Bias_1_4:					.EQU	00000000B
+   188                      <        D_Bias_1_3:					.EQU	00100000B
+   189                      <        D_Bias_1_2:					.EQU	00010000B
+   190                      <        D_ScanEnable:					.EQU	00000001B
+   191                      <       P_LCD_VLCD_Ctrl:			.EQU	$19
+   192                      <        D_Halt_Normal:					.EQU	00110000B
+   193                      <        D_Halt_Green:					.EQU	00100000B
+   194                      <        D_VLCD_28:						.EQU	00000000B
+   195                      <        D_VLCD_30:						.EQU	00000001B
+   196                      <        D_VLCD_33:						.EQU	00000010B
+   197                      <        D_VLCD_VDD:					.EQU	00000011B
+   198                      <       ;===============   Watch Dog Register  ===============
+   199                      <       P_WDT_Flag_Clear:			.EQU	$0F
+   200                      <       
+   201                      <       ;==================  Reset Register  ==================
+   202                      <       P_Reset_Status:			.EQU	$0E
+   203                      <        D_FlagC:						.EQU	00000001B;Reset in normal mode
+   204                      <        D_FlagON:						.EQU	00000010B;Reset in standby mode
+   205                      <        
+   206                      <       ;==================  AUDIO Register  =================
+   207                      <       ; Buzzer Output Control (PD[1:0] is buzzer output)
+   208                      <       P_AUDIO_BZ_Ctrl:			.EQU	$16
+   209                      <        D_C32KOUT:						.EQU	10000000B
+   210                      <        D_Buzzer1:						.EQU	00000010B
+   211                      <        D_Buzzer0:						.EQU	00000001B
+   212                      <       
+   213                      <       ;==================  LVD Register  ===================
+   214                      <       P_LVD_Ctrl:					.EQU	$1B
+   215                      <        D_LVD_State:					.EQU	00000001B
+   216                      <        D_LVD_22:						.EQU	00000000B
+   217                      <        D_LVD_24:						.EQU	01000000B
+   218                      <        D_LVD_27:						.EQU	10000001B
+   219                      <        D_LVD_33:						.EQU	11000001B
+   220                      <       P_INT_LVD_Clear:			.EQU	$46
+   221                      <       
+   222                      <       ;================  RFC Control Register  ==============
+   223                      <       P_RFC_Ctrl:					.EQU	$17
+   224                      <        D_EXT1EDG:						.EQU	10000000B
+   225                      <        D_EXT2EDG:						.EQU	01000000B
+   226                      <        D_RFCEN:						.EQU	00000001B
+   227                      <       ;=================  PWM Register  =====================
+   228                      <       P_PWMIO_Ctrl:				.EQU	$3030
+   229                      <       P_PWMIO_IO0_DUTY:			.EQU	$3032
+   230                      <       P_PWMIO_IO1_DUTY:			.EQU	$3033
+   231                      <       P_PWMIO_IO2_DUTY:			.EQU	$3034
+   232                      <       P_PWMIO_IO3_DUTY:			.EQU	$3035
+   233                      <       
+   234                      <       ;**********************************************************************
+   235                      <       ;ROM Checksum
+   236                      <       ;**********************************************************************
+   237                      <       ;.IF (GPL813P01Ax+GPL813P01Bx+GPL813P01Cx)
+   238                      <       ;	D_BankNum:						.EQU	1	
+   239                      <       ;.ENDIF
+   240                      <       
+   241                      <       	D_Bank0UserRomStartAddr:		.EQU	0xE000		;0x4800 ~ 0x7FDF:User ROM Code
+   242                      <       	D_Bank0UserRomEndAddr:			.EQU	0xFFDF
+   243                      <       	D_NMIandResetVectorStartAddr:	.EQU	0xFFFC		;0xFFF8 ~ 0xFFF9:User ROM Code, 0xFFFA ~ 0xFFFF:NMI & Reset & IRQ vector
+   244                      <       	D_NMIandResetVectorEndAddr:		.EQU	0xFFFF
+   245                      <       
+   246                      <       ; ========================================================================================
+   247                      <       ; Macro Name	: M_UserRomChecksum
+   248                      <       ; Parameters	: None
+   249                      <       ; Return Value	: R_ChecksumResult: bit[7:0]
+   250                      <       ;				: R_ChecksumResult + 1: bit[15:8]
+   251                      <       ;				: R_ChecksumResult + 2: bit[23:16]
+   252                      <       ;				: R_ChecksumResult + 3: bit[31:24]
+   253                      <       ; Description	: Calculate user ROM area code checksum
+   254                      <       ; Destroy		: A, Y
+   255                      <       ; Example		: %M_UserRomChecksum	R_ChecksumAddrPtr, R_ChecksumResult
+   256                      <       ; ========================================================================================	
+   257                      <       %M_UserRomChecksum:	.MACRO	R_ChecksumAddrPtr, R_ChecksumResult
+   258                      <       	
+   259                      <       	LDA		#0
+   260                      <       	STA		R_ChecksumResult						;Result Byte0
+   261                      <       	STA		R_ChecksumResult + 1				;Result Byte1
+   262                      <       	STA		R_ChecksumResult + 2				;Result Byte2
+   263                      <       	STA		R_ChecksumResult + 3				;Result Byte3
+   264                      <       ;=================== Bank 0 ==================================================	
+   265                      <       	LDA		#.HIGH.D_Bank0UserRomStartAddr
+   266                      <       	STA		R_ChecksumAddrPtr + 1				;Start High Byte
+   267                      <       	LDA		#.LOW.D_Bank0UserRomStartAddr
+   268                      <       	STA		R_ChecksumAddrPtr						;Start Low Byte
+   269                      <       		
+   270                      <       	LDY		#0	
+   271                      <       
+   272                      <       L_ChecksumLoop1?
+   273                      <       	STA		P_WDT_Flag_Clear	
+   274                      <       	CLC
+   275                      <       	LDA		(R_ChecksumAddrPtr),Y
+   276                      <       	ADC		R_ChecksumResult						;Result Low Byte
+   277                      <       	STA		R_ChecksumResult						;Result Low Byte
+   278                      <       	BCC		L_CheckAddress1?
+   279                      <       	INC		R_ChecksumResult + 1				;Result Byte1
+   280                      <       	BNE		L_CheckAddress1?
+   281                      <       	INC		R_ChecksumResult + 2				;Result Byte3
+   282                      <       	BNE		L_CheckAddress1?
+   283                      <       	INC		R_ChecksumResult + 3				;Result Byte4
+   284                      <       		
+   285                      <       L_CheckAddress1?:
+   286                      <       	LDA		R_ChecksumAddrPtr + 1				;Address Pointer HB
+   287                      <       	CMP		#.HIGH.D_Bank0UserRomEndAddr		;End High Byte
+   288                      <       	BNE		L_IncreaseAdd1?
+   289                      <       	
+   290                      <       	LDA		R_ChecksumAddrPtr						;Address Pointer LB
+   291                      <       	CMP		#.LOW.D_Bank0UserRomEndAddr			;End Low Byte
+   292                      <       	BEQ		L_ExitRomSum1?
+   293                      <       	
+   294                      <       L_IncreaseAdd1?:
+   295                      <       	INC		R_ChecksumAddrPtr						;Address Pointer LB
+   296                      <       	BNE		L_ChecksumLoop1?
+   297                      <       	INC		R_ChecksumAddrPtr + 1				;Address Pointer HB
+   298                      <       	JMP		L_ChecksumLoop1?	
+   299                      <       		
+   300                      <       L_ExitRomSum1?:	
+   301                      <       
+   302                      <       ;===================NMI & Reset Vector==================================================		
+   303                      <       	LDA		#.HIGH.D_NMIandResetVectorStartAddr
+   304                      <       	STA		R_ChecksumAddrPtr + 1				; Start High Byte
+   305                      <       	LDA		#.LOW.D_NMIandResetVectorStartAddr
+   306                      <       	STA		R_ChecksumAddrPtr						;Start Low Byte
+   307                      <       		
+   308                      <       L_ChecksumLoop2?
+   309                      <       	STA		P_WDT_Flag_Clear		
+   310                      <       	CLC
+   311                      <       	LDA		(R_ChecksumAddrPtr),Y
+   312                      <       	ADC		R_ChecksumResult						;Result Low Byte
+   313                      <       	STA		R_ChecksumResult						;Result Low Byte
+   314                      <       	BCC		L_CheckAddress2?
+   315                      <       	INC		R_ChecksumResult + 1				;Result Byte2
+   316                      <       	BNE		L_CheckAddress2?
+   317                      <       	INC		R_ChecksumResult + 2				;Result Byte3
+   318                      <       	BNE		L_CheckAddress2?
+   319                      <       	INC		R_ChecksumResult + 3				;Result Byte4
+   320                      <       		
+   321                      <       L_CheckAddress2?:
+   322                      <       	LDA		R_ChecksumAddrPtr + 1				;Address Pointer HB
+   323                      <       	CMP		#.HIGH.D_NMIandResetVectorEndAddr	;End High Byte
+   324                      <       	BNE		L_IncreaseAdd2?
+   325                      <       	
+   326                      <       	LDA		R_ChecksumAddrPtr						;Address Pointer LB
+   327                      <       	CMP		#.LOW.D_NMIandResetVectorEndAddr	;End Low Byte
+   328                      <       	BEQ		L_ExitRomSum2?
+   329                      <       	
+   330                      <       L_IncreaseAdd2?:
+   331                      <       	INC		R_ChecksumAddrPtr						;Address Pointer LB
+   332                      <       	BNE		L_ChecksumLoop2?
+   333                      <       	INC		R_ChecksumAddrPtr + 1				;Address Pointer HB
+   334                      <       	JMP		L_ChecksumLoop2?	
+   335                      <       		
+   336                      <       L_ExitRomSum2?:	
+   337                      <       ;;=====================Bank area================================================		
+   338                      <       	
+   339                      <       	.ENDM
+   340                      <       ;================================================================================
+   341                      <       
+   342                      <       			.ENDIF
+   343                      <       .ENDIF
+   344                      <       	.ENDIF
+   345                      <       	
+   346                              ;.INCLUDE	GPL815P.inc
+   347                              ;.INCLUDE	sys\System.inc
+   348                              ;.INCLUDE	define.inc
+   349                              
+   350                              ;==========================================
+   351                              ; Constant define area
+   352                              ;==========================================
+   353                              ;~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   354                              I2C_SDA:	.equ		00010000B		;PD4 - SDA引脚掩码
+   355                              I2C_SCL:	.equ		00001000B		;PD3 - SCL引脚掩码
+   356                              I2C_SCL_SDA_VAL: .EQU	00011000B	; PD4+PD3组合置位值
+   357                              P_I2C_Dat:	.equ		P_IO_PortD_Data
+   358                              
+   359                              
+   360                              C_SlaveAddr: .EQU		10001000b;00100000b; [RDA5708]; //00100000b;[QN8035];//10100000b;[24c01];//10001010b;[STHTV4]	;器件地址 
+   361                              C_Write:	 .EQU		00000000b
+   362                              C_Read:		 .EQU		00000001b
+   363                              ;==========================================
+   364                              ; External declare area
+   365                              ;==========================================
+   366                              
+   367                              
+   368                              
+   369                              
+   370                              ;==========================================
+   371                              ; Public declare area
+   372                              ;==========================================
+   373                              .PUBLIC		R_Wbuff
+   374                              .PUBLIC		R_Wbuff1
+   375                              .PUBLIC		P_IOB_DIR_Map
+   376                              .PUBLIC		P_IOC_DIR_Map
+   377                              .PUBLIC		P_IOD_DIR_Map
+   378                              .PUBLIC		P_IOA_DIR_Map
+   379                              .PUBLIC		P_IOA_Attrib_Map	
+   380                              .PUBLIC		R_SaveData
+   381                              .PUBLIC		R_PortD_Data_Buf
+   382                              ;==========================================
+   383                              ;Variable RAM declare area
+   384                              ;==========================================
+   385 000000BE                     .PAGE0
+   386 000000BE FF                  R_Wbuff				.DS	1
+   387 000000BF FF                  R_Wbuff1			.ds	1
+   388 000000C0 FF                  P_IOB_DIR_Map		.DS	1		;
+   389 000000C1 FF                  P_IOC_DIR_Map		.DS	1		;
+   390 000000C2 FF                  P_IOD_DIR_Map		.DS	1		;
+   391 000000C3 FF                  P_IOA_DIR_Map		.DS	1	
+   392 000000C4 FF                  R_PortD_Data_Buf	ds	1
+   393                              
+   394 000000C5 FF                  P_IOA_Attrib_Map	ds	1
+   395 000000C6 FF FF FF FF         R_SaveData			ds	6
+                FF FF      
+   396 000000CC FF                  R_ACK_Timeout		ds	1
+   397 000000CD FF                  R_ACK_Err			ds	1
+   398                              ;==========================================
+   399                              ; code starting 
+   400                              ;==========================================
+   401 0000F09E                     .CODE
+   402                              ;-------------SetIO Pin------------------------
+   403                              ;***************************************
+   404 0000F09E                     B_SDA_0:	;Set SDA output L
+   405 0000F09E A5 C2               		LDA		P_IOD_DIR_Map
+   406 0000F0A0 09 10               		ORA		#I2C_SDA
+   407 0000F0A2 85 C2               		STA		P_IOD_DIR_Map
+   408 0000F0A4 85 11               		STA		P_IO_PortD_Dir
+   409 0000F0A6 A5 C4               		LDA		R_PortD_Data_Buf
+   410 0000F0A8 29 EF               		AND		#.not.I2C_SDA
+   411 0000F0AA 85 C4               		STA		R_PortD_Data_Buf
+   412 0000F0AC 85 13               		STA		P_IO_PortD_Data
+   413 0000F0AE 60                  			RTS			
+   414                              ;***************************************
+   415                              .public			B_SDA_1
+   416 0000F0AF                     B_SDA_1:	;Set SDA output H
+   417 0000F0AF A5 C2               		LDA		P_IOD_DIR_Map
+   418 0000F0B1 09 10               		ORA		#I2C_SDA
+   419 0000F0B3 85 C2               		STA		P_IOD_DIR_Map
+   420 0000F0B5 85 11               		STA		P_IO_PortD_Dir
+   421 0000F0B7 A5 C4               		LDA		R_PortD_Data_Buf
+   422 0000F0B9 09 10               		ORA		#I2C_SDA
+   423 0000F0BB 85 C4               		STA		R_PortD_Data_Buf
+   424 0000F0BD 85 13               		STA		P_IO_PortD_Data
+   425 0000F0BF 60                  			RTS	
+   426                              ;***************************************			
+   427 0000F0C0                     B_SCL_0:	;Set SCL output L
+   428 0000F0C0 A5 C2               		LDA		P_IOD_DIR_Map
+   429 0000F0C2 09 08               		ORA		#I2C_SCL
+   430 0000F0C4 85 C2               		STA		P_IOD_DIR_Map
+   431 0000F0C6 85 11               		STA		P_IO_PortD_Dir
+   432 0000F0C8 A5 C4               		LDA		R_PortD_Data_Buf
+   433 0000F0CA 29 F7               		AND		#.not.I2C_SCL
+   434 0000F0CC 85 C4               		STA		R_PortD_Data_Buf
+   435 0000F0CE 85 13               		STA		P_IO_PortD_Data
+   436 0000F0D0 60                  		RTS	
+   437                              ;***************************************
+   438                              .PUBLIC		B_SCL_1
+   439 0000F0D1                     B_SCL_1:	;Set SCL output H
+   440 0000F0D1 A5 C2               		LDA		P_IOD_DIR_Map
+   441 0000F0D3 09 08               		ORA		#I2C_SCL
+   442 0000F0D5 85 C2               		STA		P_IOD_DIR_Map
+   443 0000F0D7 85 11               		STA		P_IO_PortD_Dir
+   444 0000F0D9 A5 C4               		LDA		R_PortD_Data_Buf
+   445 0000F0DB 09 08               		ORA		#I2C_SCL
+   446 0000F0DD 85 C4               		STA		R_PortD_Data_Buf
+   447 0000F0DF 85 13               		STA		P_IO_PortD_Data
+   448 0000F0E1 60                  		RTS	
+   449                              ;***************************************			
+   450 0000F0E2                     B_SCLSDA_0:	;Set SCL & SDA output L
+   451 0000F0E2 A5 C2               		LDA		P_IOD_DIR_Map
+   452 0000F0E4 09 18               		ORA		#I2C_SCL_SDA_VAL
+   453 0000F0E6 85 C2               		STA		P_IOD_DIR_Map
+   454 0000F0E8 85 11               		STA		P_IO_PortD_Dir
+   455 0000F0EA A5 C4               		LDA		R_PortD_Data_Buf
+   456 0000F0EC 29 E7               		AND		#.not.I2C_SCL_SDA_VAL
+   457 0000F0EE 85 C4               		STA		R_PortD_Data_Buf
+   458 0000F0F0 85 13               		STA		P_IO_PortD_Data		;SCL
+   459 0000F0F2 60                  		RTS				
+   460                              ;***************************************			
+   461 0000F0F3                     B_SCLSDA_1:	;Set SCL & SDA output H
+   462 0000F0F3 A5 C2               		LDA		P_IOD_DIR_Map
+   463 0000F0F5 09 18               		ORA		#I2C_SCL_SDA_VAL
+   464 0000F0F7 85 C2               		STA		P_IOD_DIR_Map
+   465 0000F0F9 85 11               		STA		P_IO_PortD_Dir
+   466 0000F0FB A5 C4               		LDA		R_PortD_Data_Buf
+   467 0000F0FD 09 18               		ORA		#I2C_SCL_SDA_VAL
+   468 0000F0FF 85 C4               		STA		R_PortD_Data_Buf
+   469 0000F101 85 13               		STA		P_IO_PortD_Data		;SCL
+   470 0000F103 60                  		RTS	
+   471                              ;***************************************
+   472                              .PUBLIC		B_SDA_F
+   473 0000F104                     B_SDA_F:	;Release SDA so the slave can drive ACK/data bits
+   474 0000F104 A5 C2               		LDA		P_IOD_DIR_Map
+   475 0000F106 29 EF               		AND		#.not.I2C_SDA
+   476 0000F108 85 C2               		STA		P_IOD_DIR_Map
+   477 0000F10A 85 11               		STA		P_IO_PortD_Dir
+   478 0000F10C A5 C4               		LDA		R_PortD_Data_Buf
+   479 0000F10E 09 10               		ORA		#I2C_SDA
+   480 0000F110 85 C4               		STA		R_PortD_Data_Buf
+   481 0000F112 85 13               		STA		P_IO_PortD_Data		;SDA
+   482 0000F114 60                  		RTS
+   483                              
+   484                              
+   485                              ; 旧 PA4/PA5 版本的注释实现已移除，当前硬件固定为 PD3=SCL、PD4=SDA。
+   486 0000F115                     F_I2C_Delay:
+   487 0000F115 A9 00               		LDA		#00
+   488 0000F117 85 0F               	   STA	   P_WDT_Flag_Clear
+   489 0000F119 EA                  		NOP
+   490 0000F11A EA                  		NOP
+   491 0000F11B EA                  		NOP
+   492 0000F11C EA                  		NOP
+   493 0000F11D EA                  		NOP
+   494 0000F11E EA                  		NOP
+   495 0000F11F EA                  		NOP
+   496 0000F120 EA                  		NOP
+   497 0000F121 EA                  		NOP
+   498 0000F122 EA                  		NOP
+   499 0000F123 EA                  		NOP
+   500 0000F124 EA                  		NOP
+   501 0000F125 EA                  		NOP
+   502 0000F126 EA                  		NOP
+   503 0000F127 EA                  		NOP
+   504 0000F128 EA                  		NOP
+   505 0000F129 EA                  		NOP
+   506 0000F12A EA                  		NOP
+   507                              
+   508 0000F12B 60                  			RTS
+   509                              ;=========================================================
+   510                              .PUBLIC	F_IIC_start			
+   511                              ;****************************************			
+   512 0000F12C                     F_IIC_start:	; SCL == H, SDA = H to L
+   513 0000F12C 20 F3 F0            		JSR		B_SCLSDA_1
+   514 0000F12F 20 15 F1            		JSR		F_I2C_Delay
+   515 0000F132 20 15 F1            		JSR		F_I2C_Delay
+   516 0000F135 20 9E F0            		JSR		B_SDA_0
+   517 0000F138 20 15 F1            		JSR		F_I2C_Delay
+   518 0000F13B 20 15 F1            		JSR		F_I2C_Delay	
+   519 0000F13E 60                  			RTS
+   520                              ;=========================================================
+   521                              .PUBLIC	F_IIC_stop				
+   522                              ;****************************************			
+   523 0000F13F                     F_IIC_stop:		; SCL == L, SDA = L to H
+   524 0000F13F 20 E2 F0            		JSR		B_SCLSDA_0
+   525 0000F142 20 15 F1            		JSR		F_I2C_Delay
+   526 0000F145 20 D1 F0            		JSR		B_SCL_1
+   527 0000F148 20 15 F1            		JSR		F_I2C_Delay
+   528 0000F14B 20 AF F0            		JSR		B_SDA_1
+   529 0000F14E 20 15 F1            		JSR		F_I2C_Delay	
+   530 0000F151 60                  			RTS	
+   531                              ;=========================================================
+   532                              .PUBLIC	F_IIC_Set8bit			
+   533                              ;****************************************	
+   534 0000F152                     F_IIC_Set8bit:	; Y = input 8bit data value	
+   535 0000F152 20 C0 F0            		JSR		B_SCL_0
+   536 0000F155 20 15 F1            		JSR		F_I2C_Delay
+   537                              		;X = bit count; Y = be write byte
+   538 0000F158 A2 08               		LDX		#8
+   539 0000F15A                     	?loop:	
+   540 0000F15A 98                  		TYA               ; 先把Y加载到A，不修改Y
+   541 0000F15B 29 80               		AND		#0x80        ; 提取最高位（0x80=10000000B）
+   542 0000F15D F0 06               		BEQ		?set_0       ; 最高位为0 → 发0
+   543 0000F15F                     	?set_1:	
+   544 0000F15F 20 AF F0            		JSR		B_SDA_1		
+   545 0000F162 4C 68 F1            		JMP		?next
+   546 0000F165                     	?set_0:
+   547 0000F165 20 9E F0            		JSR		B_SDA_0
+   548 0000F168                     	?next:	
+   549 0000F168 20 15 F1            		JSR		F_I2C_Delay
+   550 0000F16B 20 D1 F0            		JSR		B_SCL_1
+   551 0000F16E 20 15 F1            		JSR		F_I2C_Delay
+   552 0000F171 20 C0 F0            		JSR		B_SCL_0
+   553 0000F174 20 15 F1            		JSR		F_I2C_Delay
+   554                              		; 移位操作放在最后（判断完再移位）
+   555 0000F177 98                  		TYA
+   556 0000F178 0A                  		ASL		A			; 左移1位，准备下一位
+   557 0000F179 A8                  		TAY	
+   558 0000F17A CA                  		DEX		
+   559 0000F17B D0 DD               		BNE		?loop	
+   560 0000F17D 60                  		RTS	
+   561                              ;		TYA
+   562                              ;		ASL		A			;从高到低开始传
+   563                              ;	;	LSR		A			;从低到高开始传
+   564                              ;		TAY	
+   565                              ;		BCS		?set_1
+   566                              ;	?set_0:
+   567                              ;		JSR		B_SDA_0
+   568                              ;		JMP		?next
+   569                              ;	?set_1:	
+   570                              ;		JSR		B_SDA_1		
+   571                              ;	?next:	
+   572                              ;		JSR		F_I2C_Delay
+   573                              ;		JSR		B_SCL_1
+   574                              ;		JSR		F_I2C_Delay
+   575                              ;		JSR		B_SCL_0
+   576                              ;		JSR		F_I2C_Delay
+   577                              ;		DEX		
+   578                              ;		BNE		?loop	
+   579                              ;			RTS
+   580                              ;=========================================================	
+   581                              .PUBLIC	F_IIC_get8bit			
+   582                              ;****************************************			
+   583 0000F17E                     F_IIC_get8bit:	; Y = output 8bit data value
+   584                              		;设置SDA口为Input floating状态
+   585 0000F17E 20 04 F1            		JSR		B_SDA_F
+   586                              		;X表示bit的个数,Y表示读出的值
+   587 0000F181 A2 08               		LDX		#8
+   588 0000F183 A0 00               		LDY		#0
+   589 0000F185                     	?loop:
+   590                              		; SCK = 1 and Delay		
+   591 0000F185 20 D1 F0            		JSR		B_SCL_1
+   592 0000F188 20 15 F1            		JSR		F_I2C_Delay
+   593 0000F18B 20 15 F1            		JSR		F_I2C_Delay
+   594                              		; Get SDA and Save to Y
+   595 0000F18E A5 13               		LDA		P_I2C_Dat
+   596 0000F190 29 10               		AND		#I2C_SDA
+   597 0000F192 C9 10               		CMP		#I2C_SDA
+   598 0000F194 98                  		TYA
+   599 0000F195 2A                  		ROL		A			;从高到低接收
+   600                              	;	ROR		A			;从低到高接收
+   601 0000F196 A8                  		TAY
+   602                              		;SCK = 0 and Delay
+   603 0000F197 20 C0 F0            		JSR		B_SCL_0
+   604 0000F19A 20 15 F1            		JSR		F_I2C_Delay	
+   605 0000F19D 20 15 F1            		JSR		F_I2C_Delay
+   606                              		; Check finish of 8 bit move out or not
+   607 0000F1A0 CA                  		DEX
+   608 0000F1A1 D0 E2               		BNE		?loop
+   609                              		;设置SDA output	low, 接下来是SACK或SNACK,
+   610 0000F1A3 20 9E F0            		JSR		B_SDA_0		
+   611 0000F1A6 60                  			RTS	
+   612                              ;=========================================================
+   613                              .PUBLIC	F_ACK	;发送ACK
+   614                              ;****************************************			
+   615 0000F1A7                     F_ACK:	;Check ACK & Send ACK [[no check ACK but only wait one scycle]]
+   616 0000F1A7 20 9E F0            		JSR		B_SDA_0
+   617 0000F1AA 20 15 F1            		JSR		F_I2C_Delay
+   618 0000F1AD 20 D1 F0            		JSR		B_SCL_1
+   619 0000F1B0 20 15 F1            		JSR		F_I2C_Delay
+   620 0000F1B3 20 C0 F0            		JSR		B_SCL_0
+   621 0000F1B6 20 15 F1            		JSR		F_I2C_Delay
+   622 0000F1B9 20 15 F1            		JSR		F_I2C_Delay
+   623 0000F1BC 60                  			RTS	
+   624                              ;=========================================================
+   625                              .PUBLIC	F_RACK  ;接收ACK
+   626                              ;****************************************						
+   627 0000F1BD                     F_RACK:
+   628 0000F1BD 20 04 F1            		JSR		B_SDA_F
+   629 0000F1C0 20 15 F1            		JSR		F_I2C_Delay	
+   630                              		;------------------------
+   631 0000F1C3 A9 00               		LDA		#0		
+   632 0000F1C5 85 CD               		STA		R_ACK_Err
+   633 0000F1C7 85 CC               		STA		R_ACK_Timeout	
+   634 0000F1C9 20 D1 F0            		JSR		B_SCL_1
+   635 0000F1CC 20 15 F1            		JSR		F_I2C_Delay
+   636 0000F1CF                     	?wait:	
+   637 0000F1CF A9 00               		LDA		#00
+   638 0000F1D1 85 0F               	   STA	   P_WDT_Flag_Clear
+   639                              
+   640 0000F1D3 E6 CC               		INC		R_ACK_Timeout
+   641                              		
+   642 0000F1D5 A5 CC               		LDA		R_ACK_Timeout
+   643 0000F1D7 C9 80               		CMP		#0x80			; 超时阈值（可调整，如0x80≈1ms，需匹配你的F_I2C_Delay时长）
+   644 0000F1D9 B0 14               		BCS		?ACK_Timeout
+   645                              		
+   646 0000F1DB A5 13               		LDA		P_I2C_Dat	
+   647 0000F1DD 29 10               		AND		#I2C_SDA
+   648 0000F1DF D0 EE               		BNE		?wait
+   649                              		
+   650                              	;	BNE		?FailRACK
+   651 0000F1E1 20 C0 F0            		JSR		B_SCL_0
+   652 0000F1E4 20 15 F1            		JSR		F_I2C_Delay
+   653 0000F1E7 20 15 F1            		JSR		F_I2C_Delay
+   654                              		;设置SDA output	low,
+   655 0000F1EA 20 9E F0            		JSR		B_SDA_0
+   656 0000F1ED 38                  		SEC				; ACK received
+   657 0000F1EE 60                  		RTS
+   658 0000F1EF                     	?ACK_Timeout:
+   659 0000F1EF A9 01               		LDA		#0x01	
+   660 0000F1F1 85 CD               		STA		R_ACK_Err
+   661 0000F1F3 20 C0 F0            		JSR		B_SCL_0
+   662 0000F1F6 20 15 F1            		JSR		F_I2C_Delay
+   663 0000F1F9 20 15 F1            		JSR		F_I2C_Delay
+   664 0000F1FC 20 9E F0            		JSR		B_SDA_0
+   665 0000F1FF 18                  		CLC				; ACK timeout / NAK
+   666 0000F200 60                  		RTS
+   667                              
+   668                              
+   669                              			
+   670                              ;=========================================================	
+   671                              .PUBLIC F_NACK	;发送NACK		
+   672                              ;****************************************			
+   673 0000F201                     F_NACK: ;Send NACK
+   674 0000F201 20 AF F0            		JSR		B_SDA_1
+   675 0000F204 20 15 F1            		JSR		F_I2C_Delay
+   676 0000F207 20 D1 F0            		JSR		B_SCL_1
+   677 0000F20A 20 15 F1            		JSR		F_I2C_Delay
+   678 0000F20D 20 C0 F0            		JSR		B_SCL_0
+   679 0000F210 20 15 F1            		JSR		F_I2C_Delay
+   680 0000F213 60                  			RTS	
+   681                              			
+   682                              ;****************************************************************************************
+   683                              ;函数名称: F_I2C_Initial
+   684                              ;功能描述: 初始I2C_SCK,I2C_SDA两个IO为output high
+   685                              ;****************************************************************************************
+   686                              .PUBLIC F_I2C_Initial
+   687                              ;~~~~~~~~~~~~~~~~~~~~~~~~
+   688 0000F214                     F_I2C_Initial:				
+   689                              ;		LDA		P_12C_DirMap
+   690                              ;		ORA		#(I2C_SCK+I2C_SDA)
+   691                              ;		STA		P_12C_DirMap
+   692                              ;		STA		P_I2C_Dir			
+   693                              	
+   694                              ;		LDA		P_12C_DatMap
+   695                              ;		ORA		#(I2C_SCK+I2C_SDA)
+   696                              ;		STA		P_12C_DatMap
+   697                              ;		STA		P_I2C_Dat
+   698 0000F214 60                  			RTS			
+   699                              ;******************************************************************************************************
+   700                              ; 名    称: F_I2C_WriteData
+   701                              ; 输    入: A->设备的特殊寄存器地址; X->写入的值
+   702                              ; 输    出:			
+   703                              ; 描    述: 对I2C设备写入1个byte数据
+   704                              ;*****************************************************************************************************
+   705                              .PUBLIC	F_I2C_WriteData			
+   706                              ;~~~~~~~~~~~~~~~~~~~~	
+   707 0000F215                     F_I2C_WriteData: ;设备地址长度1 byte; 数据长度1 word
+   708                              ;		STA		R_Wbuff+0
+   709 0000F215 86 BF               		STX		R_Wbuff1		
+   710 0000F217 20 2C F1            		JSR		F_IIC_start		
+   711 0000F21A A0 88               		LDY		#(C_SlaveAddr+C_Write)
+   712 0000F21C 20 52 F1            		JSR		F_IIC_Set8bit
+   713                              ;		JSR		F_ACK	
+   714                              		
+   715                              ;		LDY		R_Wbuff+0
+   716                              ;		JSR		F_IIC_Set8bit
+   717                              ;		JSR		F_ACK
+   718 0000F21F 20 BD F1            		JSR		F_RACK		
+   719 0000F222 A5 CD               		LDA		R_ACK_Err
+   720 0000F224 D0 10               		BNE		I2C_Write_Err	; 超时/无应答，跳转到错误处理
+   721                              			
+   722 0000F226 A4 BF               		LDY		R_Wbuff1		
+   723 0000F228 20 52 F1            		JSR		F_IIC_Set8bit	
+   724 0000F22B 20 BD F1            		JSR		F_RACK                    ; 检测数据应答
+   725 0000F22E A5 CD               		LDA		R_ACK_Err
+   726 0000F230 D0 04               		BNE		I2C_Write_Err            ; 数据无应答，跳转到错误处理		
+   727 0000F232 20 3F F1            		JSR		F_IIC_stop
+   728                              		
+   729 0000F235 60                  		RTS
+   730 0000F236                     	I2C_Write_Err:
+   731 0000F236 20 3F F1            		JSR		F_IIC_stop
+   732 0000F239 60                  		RTS
+   733                              ;******************************************************************************************************
+   734                              ; 名    称: F_I2C_ReadData
+   735                              ; 输    入: A->设备的特殊寄存器地址;
+   736                              ; 输    出:	R_Wbuff+0		
+   737                              ; 描    述: 读出I2C设备寄存器1个byte数据
+   738                              ;*****************************************************************************************************
+   739                              .PUBLIC	F_I2C_ReadData			
+   740                              ;~~~~~~~~~~~~~~~~~~~~
+   741 0000F23A                     F_I2C_ReadData:
+   742                              ;		STA		R_Wbuff+0
+   743                              ;		PHA
+   744                              ;		TXA
+   745                              ;		PHA
+   746                              ;		TYA
+   747                              ;		PHA	
+   748                              ;		JSR		F_IIC_start         
+   749                              ;		LDY		R_Wbuff+0
+   750                              ;		JSR		F_IIC_Set8bit
+   751                              ;		JSR		F_ACK
+   752                              ;		JSR		F_IIC_stop		
+   753 0000F23A 20 2C F1            		JSR		F_IIC_start ; 重新启动I2C总线
+   754 0000F23D A0 89               		LDY		#(C_SlaveAddr+C_Read)
+   755 0000F23F 20 52 F1            		JSR		F_IIC_Set8bit
+   756                              ;		JSR		F_ACK	
+   757 0000F242 20 BD F1            		JSR		F_RACK
+   758 0000F245 A5 CD               		LDA		R_ACK_Err
+   759 0000F247 D0 ED               		BNE		I2C_Write_Err	; 超时/无应答
+   760                              			
+   761 0000F249 20 7E F1            		JSR		F_IIC_get8bit
+   762 0000F24C 84 C6               		STY		R_SaveData+0
+   763 0000F24E 20 A7 F1            		JSR		F_ACK	
+   764                              		
+   765 0000F251 20 7E F1            		JSR		F_IIC_get8bit
+   766 0000F254 84 C7               		STY		R_SaveData+1
+   767 0000F256 20 A7 F1            		JSR		F_ACK
+   768                              		
+   769 0000F259 20 7E F1            		JSR		F_IIC_get8bit
+   770 0000F25C 84 C8               		STY		R_SaveData+2
+   771 0000F25E 20 A7 F1            		JSR		F_ACK		
+   772                              		
+   773 0000F261 20 7E F1            		JSR		F_IIC_get8bit
+   774 0000F264 84 C9               		STY		R_SaveData+3
+   775 0000F266 20 A7 F1            		JSR		F_ACK	
+   776                              		
+   777 0000F269 20 7E F1            		JSR		F_IIC_get8bit
+   778 0000F26C 84 CA               		STY		R_SaveData+4
+   779 0000F26E 20 A7 F1            		JSR		F_ACK		
+   780                              		
+   781 0000F271 20 7E F1            		JSR		F_IIC_get8bit
+   782 0000F274 84 CB               		STY		R_SaveData+5
+   783 0000F276 20 01 F2            		JSR		F_NACK
+   784                              		
+   785 0000F279 20 3F F1            		JSR		F_IIC_stop
+   786                              		
+   787                              
+   788                              	;-------------------
+   789                              ;		PLA
+   790                              ;		TAY
+   791                              ;		PLA
+   792                              ;		TAX
+   793                              ;		PLA	
+   794 0000F27C 60                  			RTS
+   795                              		
+   796                              	
+   797                              
+   798                              ;============================================================================================================
+   799                              .END
+0 Error(s), 0 Warning(s).
+
