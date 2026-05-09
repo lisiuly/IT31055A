@@ -6,7 +6,6 @@
 -S ".\IT31055A.lik"
 -L ".\Release\STARTUP.OBJ"
 -L ".\Release\INT_VEC.OBJ"
--L ".\Release\TESTCODE.OBJ"
 -L ".\Release\RTC.OBJ"
 -L ".\Release\KEY.OBJ"
 -L ".\Release\LCD_DISPLAY.OBJ"

@@ -43,7 +43,7 @@
 ; Public declare area
 ;==========================================
 .PUBLIC	L_PowerOn
-.PUBLIC User_Code_Start
+.PUBLIC V_RESET
 ;.PUBLIC		IOD_Attmap	
 ;.PUBLIC		IOD_Dirmap	
 ;.PUBLIC		IOD_Datmap
@@ -62,8 +62,9 @@ R_INTFlag	ds	1
 ; code starting 
 ;==========================================
 .CODE
-User_Code_Start:
-Code_Start:
+V_RESET:
+; User_Code_Start:
+; Code_Start:
 		SEI					; 置中断禁止位
 		LDX		#FFH		;
 		TXS					;x-->栈指针
@@ -131,7 +132,7 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		%F_Initinal_IO	
 		JSR		F_ResetRealTimeClock	
 		%bits	R_TimeStatus,AddOthers
-		%bits	R_TempFlag,D_WithRTRH
+		; %bits	R_TempFlag,D_WithRTRH
 		
 		%FillLcdDpram #FFH
 		CLI		
@@ -193,7 +194,7 @@ L_ServiceLoop:
 		STA		P_SYSTEM_Ctrl
 		NOP
 		NOP
-		JMP		Code_Start	
+		JMP		V_RESET	
 
 .END
 

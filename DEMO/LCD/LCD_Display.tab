@@ -364,7 +364,7 @@ T_MinTeNeg:	equ	$-T_Icon
 T_CurTe100:	equ	$-T_Icon
 	LCDConvert	com0,seg08	; 当前华氏度超过100的1图标	
 T_MaxTe100:	equ	$-T_Icon
-	LCDConvert	com1,seg01	; 最大值华氏度超过100的1图标	
+	LCDConvert	com1,seg00	; 最大值华氏度超过100的1图标	
 T_MinTe100:	equ	$-T_Icon
 	LCDConvert	com0,seg06	; 最小值华氏度超过100的1图标	
 

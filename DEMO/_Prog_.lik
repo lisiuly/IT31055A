@@ -1,7 +1,7 @@
-version : Tue Apr 28 10:38:48 2026
+version : Sat May 09 08:53:49 2026
 
 options : , Microtek24, map, bin, Fill 0xFF
-input   : ".\Release\STARTUP.OBJ", ".\Release\INT_VEC.OBJ", ".\Release\TESTCODE.OBJ", ".\Release\RTC.OBJ", ".\Release\KEY.OBJ", ".\Release\LCD_DISPLAY.OBJ", ".\Release\GXHTV4.OBJ", ".\Release\D_I2C.OBJ", ".\Release\ALARM.OBJ", ".\Release\Res_Tbl.obj"
+input   : ".\Release\STARTUP.OBJ", ".\Release\INT_VEC.OBJ", ".\Release\RTC.OBJ", ".\Release\KEY.OBJ", ".\Release\LCD_DISPLAY.OBJ", ".\Release\GXHTV4.OBJ", ".\Release\D_I2C.OBJ", ".\Release\ALARM.OBJ", ".\Release\Res_Tbl.obj"
 ; No ObjectFileName for MIDIInstrument
 ; No ObjectInfo for Audio Resource
 ; No ObjectFileName for EquationTable
@@ -12,7 +12,6 @@ output  : ".\Release\IT31055A.hdb"
 ;<--UserDefineStart-->.\IT31055A.lik
 locate: PAGE0 at 0080h reference
 locate:RFCRAM	at 0180h reference
-locate: TEST_CODE at E000H		;User cannot modify it
-locate: CODE  after TEST_CODE	;User cannot modify it
+locate: CODE  at E000H	;User cannot modify it
 locate: VECTOR at FFFCH
 ;<--UserDefineEnd-->

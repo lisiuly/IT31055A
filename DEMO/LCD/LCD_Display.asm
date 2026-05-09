@@ -565,10 +565,17 @@ Disp_ProductCurrentTempC_Neg:
 Disp_ProductRenderCurrentTempFromBuf:
 			LDA		R_TempBuf+5
 			JSR		F_DisplayHLValue
+			STA		R_TempBuf+4
 			LDA		R_TempBuf
 			BNE		Disp_ProductCurTempH_Out			
+			LDA		R_TempBuf+4
+			BNE		Disp_ProductCurTempH_ShowZero
 Disp_ProductCurTempH_Blank:
 			LDA		#0AH
+			JMP		Disp_ProductCurTempH_Out
+
+Disp_ProductCurTempH_ShowZero:
+			LDA		#00H
 Disp_ProductCurTempH_Out:
 			LDX		#T_CurTeH
 			JSR		F_LcdDisplayDigital	
@@ -632,6 +639,10 @@ Disp_ProductTempRecordsDash:
 			JMP		Disp_ProductTempRecordsDashC
 
 Disp_ProductTempRecordsDashC:
+			LDX		#T_MaxTe100
+			JSR		NoDisplay_OneBit
+			LDX		#T_MinTe100
+			JSR		NoDisplay_OneBit
 			JSR		Disp_ProductRenderMaxTempDashC
 			JMP		Disp_ProductRenderMinTempDashC
 
@@ -641,6 +652,10 @@ Disp_ProductTempRecordsDashF:
 			
 Disp_ProductTempRecordsC:
 Disp_ProductRenderMaxTempC:	
+			LDX		#T_MaxTe100
+			JSR		NoDisplay_OneBit
+			LDX		#T_MinTe100
+			JSR		NoDisplay_OneBit
 			LDA		R_TempMax
 			JSR		F_DisplayHLValue
 			LDA		R_TempBuf

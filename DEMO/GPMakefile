@@ -1,6 +1,6 @@
 #####################################################################
 #
-#	Created by 6502 ASM Project		2026-4-28 10:38:45
+#	Created by 6502 ASM Project		2026-5-9 08:53:46
 #
 #####################################################################
 
@@ -44,7 +44,6 @@ BINFILE			= ".\Release\IT31055A.hdb"
 OBJFILES		= \
 	".\RELEASE\STARTUP.OBJ"\
 	".\RELEASE\INT_VEC.OBJ"\
-	".\RELEASE\TESTCODE.OBJ"\
 	".\RELEASE\RTC.OBJ"\
 	".\RELEASE\KEY.OBJ"\
 	".\RELEASE\LCD_DISPLAY.OBJ"\
@@ -91,9 +90,6 @@ BININFOFILE		= "$(TOOLSDIR)\BinInfo\BinInfo.conf"
 	$(ECHO)
 ".\RELEASE\INT_VEC.OBJ" : ".\INT_VEC.ASM" ".\GPL813X.INC" ".\SYS\PROJECT.INC" ".\SYS\MACRO.INC" ".\KEY\KEY.INC" ".\LCD\LCD_DISPLAY.INC" ".\ALARM\ALARM.INC"
 	$(ASM) $(ASMFLAG) -o ".\Release\INT_VEC.OBJ" ".\Int_Vec.asm"
-	$(ECHO)
-".\RELEASE\TESTCODE.OBJ" : ".\TESTCODE.ASM"
-	$(ASM) $(ASMFLAG) -o ".\Release\TESTCODE.OBJ" ".\TestCode.asm"
 	$(ECHO)
 ".\RELEASE\RTC.OBJ" : ".\RTC\RTC.ASM" ".\SYS\MACRO.INC" ".\KEY\KEY.INC" ".\ALARM\ALARM.INC"
 	$(ASM) $(ASMFLAG) -o ".\Release\RTC.OBJ" ".\RTC\RTC.asm"
