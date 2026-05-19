@@ -103,6 +103,7 @@ F_2HzWakeUp:                           ;半秒 0.5s
   		LDA		#D_TMBAInt
 		STA		P_INT_TimeBaseA_Clear
   		JSR		F_2Hz_Cnt
+	    JSR		F_CheckLowBattery
 	    JSR		F_RealTimeClock   ;rtc		
 	    JSR	    F_JudgeRFC		;温湿度检测	    	
 	    JMP		L_ServiceLoop	
@@ -133,6 +134,9 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		JSR		F_ResetRealTimeClock	
 		%bits	R_TimeStatus,AddOthers
 		; %bits	R_TempFlag,D_WithRTRH
+	
+		LDA		#D_LVD_24		; 上电/唤醒后统一把低电检测门槛拉到 2.4V
+		STA		P_LVD_Ctrl
 		
 		%FillLcdDpram #FFH
 		CLI		
