@@ -108,9 +108,13 @@ V_IRQ:
 		DEC		R_DebounceCnt
 	
 	?L_FastAdd: ; 长按倒计时改由 2Hz 路径处理
-		JSR		F_MoldAlarm128Hz
-	
+;		JSR		F_MoldAlarm128Hz
+		LDA	R_MoldAlarmTm
+		beq	?Check_ToneTime
+		DEC	R_MoldAlarmTm
+		
 	?Check_ToneTime:; 检查按键音时间是否为零，如果不为零则递减
+
 		LDA	R_KeyToneTm
 		beq	?L_2hz_INT
 		DEC	R_KeyToneTm

@@ -122,7 +122,11 @@ Disp_ProductHistoryPage:
 Disp_ProductPage:
 			; 标准页和历史页共用一个入口，是否显示历史页签由 R_ProductPage 决定。
 			%btst	R_TimeStatus,AddOthers,Disp_ProductUpdateAll
-			RTS
+			JMP		Disp_ProductIdleRefresh
+
+Disp_ProductIdleRefresh:
+			; 标准/历史页空闲时仍需要维持 Mold 图标的半秒闪烁，不必整页重刷。
+			JMP		Disp_ProductShowMoldAlert
 
 Disp_ProductStandardUpdateAll:
 Disp_ProductHistoryUpdateAll:
@@ -234,12 +238,11 @@ Disp_ProductMoldPage:
 			JMP		Disp_ProductSetHideValue
 
 Disp_ProductMoldUpdateAll:
-			JMP		Disp_ProductUpdateAll
-;			; Mold 设置页沿用标准页主体，只额外让阈值显示位和 Mold 图标参与闪烁。
-;			JSR		F_ClearIncStatus
-;			JSR		Disp_ProductRefreshCommonBody
-;			JSR		Disp_ProductHidePageTabs
-;			JMP		Disp_ProductSetRenderValue
+			; Mold 设置页需要先重画共用底图，再覆盖当前阈值显示。
+			JSR		F_ClearIncStatus
+			JSR		Disp_ProductRefreshCommonBody
+			JSR		Disp_ProductHidePageTabs
+			JMP		Disp_ProductSetRenderValue
 ;
 ;Disp_ProductMoldSet:
 ;			LDA		R_TimeStatus
@@ -408,12 +411,11 @@ Disp_ProductShowHumTrendNoRefresh:
 
 ; 当前湿度达到 mold 阈值时点亮 Mold 图标。
 Disp_ProductShowMoldAlert:
-			; Mold 图标只在报警解除时灭位，报警维持时直接保持点亮。
-			JSR		Disp_ProductLoadMoldThreshold
-			STA		R_TempBuf+5
+			; Mold 图标在超阈值时按半秒闪烁，退出阈值后立即熄灭。
 			LDA		R_DispHum
-			CMP		R_TempBuf+5
+			CMP		R_MoldSetValue
 			BCC		Disp_ProductShowMoldAlertHide
+			%btsf	R_TimeStatus,HalfSecToggle,Disp_ProductShowMoldAlertHide
 			LDX		#T_Mold
 			JMP		Display_OneBit
 Disp_ProductShowMoldAlertHide:
@@ -430,13 +432,6 @@ Disp_ProductShowBatteryIcon:
 Disp_ProductShowBatteryIconHide:
 			LDX		#T_Bat
 			JMP		NoDisplay_OneBit
-
-Disp_ProductLoadMoldThreshold:
-			LDA		R_MoldSetValue
-			BNE		Disp_ProductLoadMoldThresholdExit
-			LDA		#D_MoldDefault
-Disp_ProductLoadMoldThresholdExit:
-			RTS
 
 ; 当前值直接使用兼容 RFC/GXHTV4 的实时缓冲。
 ; 先判断 HH/LL 和 C/F，再进入对应的具体显示分支。

@@ -23,10 +23,12 @@
 .PUBLIC			R_KeyToneTm
 .PUBLIC			R_SoundOn
 .PUBLIC			R_BatteryFlags
-.PUBLIC			F_MoldAlarm128Hz
+;.PUBLIC			F_MoldAlarm128Hz
 .PUBLIC			F_CheckLowBattery
 .PUBLIC			F_LoadHistoryViewBuffers
 .PUBLIC			F_ClearCurrentHistory
+
+.PUBLIC		R_MoldAlarmTm
 ;==========================================
 ;Variable RAM declare area
 ;==========================================
@@ -36,6 +38,7 @@ R_SoundOn		ds	1
 R_KeyToneTm		ds	1
 R_MoldAlarmTm	ds	1
 R_MoldAlarmIdx	ds	1
+R_MoldSampleLock	ds	1
 R_BatteryFlags	ds	1
 R_BatteryDetCnt	ds	1
 ;R_PortD_Data_Buf	ds	1
@@ -46,6 +49,7 @@ R_HUM			ds	1
 C_MoldDefaultThreshold	equ	65H
 D_BatteryLow		equ	0x01
 C_BatteryDetDebounce	equ	5
+C_MoldAlarmPatternEnd	equ	16
 
 ; history 状态位。
 ; 当前实现保留 Today / 48HrToday / Previous Day / All-time 四套记录。
@@ -89,7 +93,8 @@ R_AllRecTempMin		ds	2
 R_AllRecTempMinF	ds	2
 R_AllRecHumMax	ds	1
 R_AllRecHumMin	ds	1
-
+R_MoldAlarmRepeatCnt   ds 1       ; 霉菌报警重复次数计数器
+C_MoldAlarmRepeatMax   equ 2      ; 默认报警重复两次（两次三声）
 ; 每条 history record 固定占 11 字节：
 ; Flags(1) + TempMax(2) + TempMaxF(2) + TempMin(2) + TempMinF(2) + HumMax(1) + HumMin(1)
 C_HisRecSize		equ	0BH
@@ -205,14 +210,28 @@ CheckHalfSecToggle:
 .PUBLIC		F_UpdateTHFromGXHTV4
 F_UpdateTHFromGXHTV4:
     JSR		F_ReadGXHTV4Data
+	LDA		R_TempFlag
+	AND		#D_TempError
+	BNE		UpdateTHFromGXHTV4_Exit
     LDA		TEMP_INTEGAH
     STA		R_TempCH
     LDA		TEMP_INTEGAL
     STA		R_TempCL
     LDA		HUM
     STA		R_HUM
+	JSR		L_Jugde_Err
     JMP		CalculateRFC
 
+UpdateTHFromGXHTV4_Exit:
+	%bitr	R_TempFlag,(D_TempError+D_Err)
+	
+	RTS
+L_Jugde_Err:
+	LDA		R_TempCH
+	ORA		R_TempCL
+	BNE		UpdateTHFromGXHTV4_Exit
+	%bits	R_TempFlag,D_Err
+	RTS	
 ;-------------------------------------------------------
 ; 函数: CalculateRFC
 ; 作用: 根据原始温度高字节的符号位设置当前温度正负标志，并进入温湿度换算主链。
@@ -294,60 +313,94 @@ BatteryExit:
 
 ;-------------------------------------------------------
 ; 函数: F_MoldAlarm128Hz
-; 作用: 以 128Hz 节拍驱动霉菌报警的开关节奏。
-; 输入: R_MoldSetValue、R_DispHum、R_MoldAlarmTm、R_MoldAlarmIdx。
-; 输出: R_SoundOn、R_MoldAlarmTm、R_MoldAlarmIdx。
-; 说明: 当湿度达到阈值后，按 T_MoldAlarmPattern 预定义的节奏循环鸣叫。
-F_MoldAlarm128Hz:
-    LDA		R_MoldSetValue
-    BNE		MoldAlarm_CheckHum
-    LDA		#C_MoldDefaultThreshold
+; 作用: 以 128Hz 节拍驱动霉菌报警，每次采样触发后连续播放两次三声。
+;       采用 FFH 结束符 + 重复计数器方案，与闹钟模块写法一致。
+;-------------------------------------------------------
+; F_MoldAlarm128Hz:
+;     ; JSR     F_LoadMoldThresholdToA
+;     CMP     R_DispHum
+;     BCC     MoldAlarm_CheckTrigger
+;     BEQ     MoldAlarm_CheckTrigger
+;     JMP     MoldAlarm_Stop
 
-MoldAlarm_CheckHum:
-    CMP		R_DispHum
-    BCC		MoldAlarm_Active
-    BEQ		MoldAlarm_Active
+; MoldAlarm_CheckTrigger:
+;     LDA     R_MoldSampleLock
+;     BEQ     MoldAlarm_RunPattern
 
-MoldAlarm_Stop:
-    LDA		#00H
-    STA		R_SoundOn
-    STA		R_MoldAlarmTm
-    STA		R_MoldAlarmIdx
-	%bitr	R_KeyFlag,D_Alarming
+;     ;---- 新采样到来，武装新的报警周期 ----
+; MoldAlarm_ArmNewCycle:
+;     LDA     #00H
+;     STA     R_MoldSampleLock
+;     STA     R_MoldAlarmTm
+;     STA     R_MoldAlarmIdx
+;     LDA     #C_MoldAlarmRepeatMax
+;     STA     R_MoldAlarmRepeatCnt     ; 重置重复次数
+    ; 直接进入模式播放
+.PUBLIC		MoldAlarm_RunPattern
+MoldAlarm_RunPattern:
+    %btst   R_KeyFlag, D_Alarming,go_Alarming
     RTS
-
-MoldAlarm_Active:
-	%bits	R_KeyFlag,D_Alarming
-    LDA		R_MoldAlarmTm
-    BEQ		MoldAlarm_LoadStep
-    DEC		R_MoldAlarmTm
-    RTS
-
-MoldAlarm_LoadStep:
-    LDX		R_MoldAlarmIdx
-    LDA		T_MoldAlarmPattern,X
-    CMP		#0FFH
-    BNE		MoldAlarm_StoreStep
-    LDX		#00H
-    STX		R_MoldAlarmIdx
-    LDA		T_MoldAlarmPattern
-
-MoldAlarm_StoreStep:
-    STA		R_MoldAlarmTm
-    LDA		T_MoldAlarmPattern+1,X
-    STA		R_SoundOn
+    go_Alarming:
+    LDA     R_MoldAlarmTm
+    BNE     MoldAlarm_DecTimer       ; 定时器未到0，继续等待
+    
+    LDX     R_MoldAlarmIdx
+    LDA     T_MoldAlarmPattern,X     ; 取当前字节
+    CMP     #FFH
+    BEQ     MoldAlarm_EndOfPattern   ; 遇到结束符，检查重复
+     LDA     T_MoldAlarmPattern,X     ; 取当前字节   
+    STA     R_MoldAlarmTm            ; 加载持续时间
+    LDA     T_MoldAlarmPattern+1,X
+    STA     R_SoundOn                ; 加载声音开关
     INX
     INX
-    STX		R_MoldAlarmIdx
+    STX     R_MoldAlarmIdx
     RTS
 
-T_MoldAlarmPattern:
-    DB		08,01,08,00
-    DB		08,01,08,00
-    DB		08,01,08,00
-    DB		08,01,72,00
-    DB		0FFH
+MoldAlarm_DecTimer:
+    RTS
 
+MoldAlarm_EndOfPattern:
+    ; 一段三声播放完毕，检查是否需要再重复一次
+    DEC     R_MoldAlarmRepeatCnt
+    BEQ     MoldAlarm_StopSoundKeepLock  ; 次数用尽，停止报警
+    ; 还有剩余次数，重置索引，准备重播
+    LDX     #00H
+    STX     R_MoldAlarmIdx
+    STX     R_MoldAlarmTm
+    JMP     go_Alarming
+
+MoldAlarm_StopSoundKeepLock:
+    LDA     #00H
+    STA     R_SoundOn
+    STA     R_MoldAlarmTm
+    STA     R_MoldAlarmIdx
+    STA     R_MoldAlarmRepeatCnt
+    %bitr   R_KeyFlag, D_Alarming
+    RTS
+
+; MoldAlarm_Stop:
+;     LDA     #00H
+;     STA     R_SoundOn
+;     STA     R_MoldAlarmTm
+;     STA     R_MoldAlarmIdx
+;     STA     R_MoldSampleLock
+;     STA     R_MoldAlarmRepeatCnt      ; 清除重复计数器
+;     %bitr   R_KeyFlag, D_Alarming
+;     RTS
+    
+; F_LoadMoldThresholdToA:
+; 	LDA		R_MoldSetValue
+; 	BNE		LoadMoldThreshold_Exit
+; 	LDA		#C_MoldDefaultThreshold
+; LoadMoldThreshold_Exit:
+; 	RTS
+
+T_MoldAlarmPattern:	
+    DB		08,01,08,00
+    DB		08,01,08,00
+    DB		08,01,88,00
+    DB      FFH 
 ;-------------------------------------------------------
 ; 输入：R_TempCH, R_TempCL - 温度值(高字节和低字节)
 ;       R_HUM - 湿度值
@@ -454,8 +507,47 @@ ProcessHumidity_ConvertBCD:
     ; 保存湿度显示值
     LDA     OUT_L
     STA     R_DispHum           ; 保存湿度显示值(0-99%)
+    JSR     R_Alarm_jugde       
     RTS
-    
+
+
+ R_Alarm_jugde:
+    LDA R_MoldSetValue
+    CMP R_DispHum
+    BCC     MoldAlarm_CheckLatch
+    BEQ     MoldAlarm_CheckLatch
+    JMP     MoldAlarm_Stop
+
+MoldAlarm_CheckLatch:
+    LDA     R_MoldSampleLock
+    BNE     MoldAlarm_KeepLatched
+    JMP     MoldAlarm_ArmNewCycle
+
+MoldAlarm_KeepLatched:
+    RTS
+
+
+    ;---- 新采样到来，武装新的报警周期 ----
+MoldAlarm_ArmNewCycle:
+    LDA     #01H
+    STA     R_MoldSampleLock
+    LDA     #00H
+    STA     R_MoldAlarmTm
+    STA     R_MoldAlarmIdx
+    LDA     #C_MoldAlarmRepeatMax
+    STA     R_MoldAlarmRepeatCnt     ; 重置重复次数
+     %bits  R_KeyFlag, D_Alarming  
+     RTS
+     
+MoldAlarm_Stop:
+    LDA     #00H
+    STA     R_SoundOn
+    STA     R_MoldAlarmTm
+    STA     R_MoldAlarmIdx
+    STA     R_MoldSampleLock
+    STA     R_MoldAlarmRepeatCnt      ; 清除重复计数器
+    %bitr   R_KeyFlag, D_Alarming  
+    RTS
 ;-------------------------------------------------------
 ;;判断温湿度有无超过上下限
 ; 输入：R_HUM R_DispTemper

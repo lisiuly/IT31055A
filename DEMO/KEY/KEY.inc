@@ -71,6 +71,7 @@ D_Timering_Short	equ		02H
 D_NoKeyTone			equ		04H
 D_DC				equ		08H
 D_EnableSnooze1		equ		10h
+
 ;===================================================
 ;			Module Define
 ;====================================================

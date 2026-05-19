@@ -14,7 +14,8 @@
 .EXTERN		R_TempCH
 .EXTERN		R_TempCL
 .EXTERN		R_HUM
-	
+.EXTERN		MoldAlarm_RunPattern
+.EXTERN		R_MoldAlarmTm
 ;.EXTERN			R_PortD_Data_Buf
 ;===================================================
 ;			Module Define

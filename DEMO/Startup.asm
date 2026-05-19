@@ -137,22 +137,25 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 	
 		LDA		#D_LVD_24		; 上电/唤醒后统一把低电检测门槛拉到 2.4V
 		STA		P_LVD_Ctrl
-		
+		JSR		F_initSet		
 		%FillLcdDpram #FFH
 		CLI		
-		JSR		F_UpdateTHFromGXHTV4		;上电同步读取一次温湿度
+		JSR		F_UpdateTHFromGXHTV4		; 恢复为全显前同步取一次首样本。
 		LDA		#1
 		STA     R_LEDTemp 
 ;		JSR		F_DC_Judge			
 	Wait1_2Sec:
 		%WatchDogClear		
 		LDA		R_2Hz
-		CMP		#06H		
+		CMP		#06H	
+		%btsf	R_TempFlag,D_Err,?L_Next
+		JSR		F_UpdateTHFromGXHTV4
+		?L_Next:
 		BCC		Wait1_2Sec
 		
 	Jump_DispAll:
 		%FillLcdDpram #00H 
-		JSR		F_initSet
+
 ;		%bits	R_KeyFlag,D_KeyTone	
 ;		JSR		F_PlayKeyTone
 			
@@ -161,8 +164,8 @@ L_ServiceLoop:
 		%WatchDogClear
 		JSR		F_KeyScan		;按键扫描
 		JSR		F_PlayKeyTone	;按键音
-	
-;		JSR		F_DC_Judge
+		jsr		MoldAlarm_RunPattern
+
 		JSR		F_Display
 		
 	?L_NoDispNormal:

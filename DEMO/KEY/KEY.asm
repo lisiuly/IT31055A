@@ -258,16 +258,22 @@ Enable_AllTimeKey:			; ÇÐ»»ÀúÊ·Ò³Ç©/ÍË³ö Mold Ò³
 		LDA		#D_His48Hr
 		STA		R_HistoryPage
 		RTS
-	Product_AllTimeToggleHistory:
+Product_AllTimeToggleHistory:
 		LDA		R_HistoryPage
+		CMP		#D_His48Hr
+		BEQ		Product_AllTimeSetAll
 		CMP		#D_HisAllTm
-		BEQ		Product_AllTimeSet48Hr
+		BEQ		Product_AllTimeSetToday
+		LDA		#D_His48Hr
+		STA		R_HistoryPage
+		RTS
+Product_AllTimeSetAll:
 		LDA		#D_HisAllTm
 		STA		R_HistoryPage
 		RTS
-	Product_AllTimeSet48Hr:
-		LDA		#D_His48Hr
-		STA		R_HistoryPage
+Product_AllTimeSetToday:
+		LDA		#D_PageStandard
+		STA		R_ProductPage
 		RTS
 	Product_AllTimeExitMold:
 		LDA		#D_PageStandard

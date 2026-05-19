@@ -12,6 +12,8 @@
 ; External declare area
 ;==========================================
 .External	F_ReadGXHTV4Data
+.External	F_StartGXHTV4Measure
+.External	F_ReadGXHTV4Result
 .External	F_CAL_HEX_BCD2
 .External	F_CHANGE_CF
 
@@ -19,6 +21,7 @@
 D_TempF			equ	0x01	;1 for 'F;  0 for 'C ，上电默认为F此Bit需置１
 D_TempError		equ	0x02	;温度出错标志
 D_TempFReg		equ	0x04	;TempF for -
+D_Err			equ	0x08
 D_WithRTRH		equ	0x80	;带湿度功能，上电需定义
 
 .External	TEMP_INTEGAH			;温度整数和符号位

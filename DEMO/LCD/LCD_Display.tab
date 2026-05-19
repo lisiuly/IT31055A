@@ -199,7 +199,7 @@ F_DisplayHLValue:
 ;;==============================================================================
 ;LCD seg com define
 ;===============================================================================
-LCD_Emulator	equ	1			;1为调试，0为实际com seg
+LCD_Emulator	equ	0			;1为调试，0为实际com seg
 .IF	LCD_Emulator
 com0            EQU	0H
 com1            EQU	1H
@@ -383,11 +383,11 @@ T_MINFUnit:	equ	$-T_Icon
 	LCDConvert	com4,seg15	; 最小值华氏度图标	
 
 T_Today:	equ	$-T_Icon
-	LCDConvert	com1,seg02	; today 图标
+	LCDConvert	com4,seg05	; today 图标
 T_48Hr:		equ	$-T_Icon
 	LCDConvert	com0,seg03	; 48hr 图标
 T_AllTm:	equ	$-T_Icon
-	LCDConvert	com4,seg05	; all-time 图标
+	LCDConvert	com1,seg02	; all-time 图标
 
 
 T_PDry:		equ	$-T_Icon
