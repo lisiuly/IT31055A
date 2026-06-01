@@ -347,7 +347,8 @@ MoldAlarm_RunPattern:
     LDX     R_MoldAlarmIdx
     LDA     T_MoldAlarmPattern,X     ; 取当前字节
     CMP     #FFH
-    BEQ     MoldAlarm_EndOfPattern   ; 遇到结束符，检查重复
+    BEQ     MoldAlarm_EndOfPattern
+    ; 遇到结束符，检查重复
      LDA     T_MoldAlarmPattern,X     ; 取当前字节   
     STA     R_MoldAlarmTm            ; 加载持续时间
     LDA     T_MoldAlarmPattern+1,X
@@ -376,6 +377,7 @@ MoldAlarm_StopSoundKeepLock:
     STA     R_MoldAlarmTm
     STA     R_MoldAlarmIdx
     STA     R_MoldAlarmRepeatCnt
+;	STA     R_MoldSampleLock    
     %bitr   R_KeyFlag, D_Alarming
     RTS
 
@@ -497,6 +499,7 @@ ProcessHumidity:
 	BCC		ProcessHumidity_ConvertBCD
 	LDA		#C_HumDisp99
 	STA		R_DispHum           ; 两位湿度显示链路对 100%RH 做 99 封顶
+	JSR		R_Alarm_jugde	
 	RTS
 
 ProcessHumidity_ConvertBCD:
@@ -514,14 +517,14 @@ ProcessHumidity_ConvertBCD:
  R_Alarm_jugde:
     LDA R_MoldSetValue
     CMP R_DispHum
-    BCC     MoldAlarm_CheckLatch
-    BEQ     MoldAlarm_CheckLatch
+    BCC     MoldAlarm_ArmNewCycle
+    BEQ     MoldAlarm_ArmNewCycle
     JMP     MoldAlarm_Stop
 
-MoldAlarm_CheckLatch:
-    LDA     R_MoldSampleLock
-    BNE     MoldAlarm_KeepLatched
-    JMP     MoldAlarm_ArmNewCycle
+;MoldAlarm_CheckLatch:
+;    LDA     R_MoldSampleLock
+;    BNE     MoldAlarm_KeepLatched
+;    JMP     MoldAlarm_ArmNewCycle
 
 MoldAlarm_KeepLatched:
     RTS
@@ -529,6 +532,7 @@ MoldAlarm_KeepLatched:
 
     ;---- 新采样到来，武装新的报警周期 ----
 MoldAlarm_ArmNewCycle:
+	CLI
     LDA     #01H
     STA     R_MoldSampleLock
     LDA     #00H

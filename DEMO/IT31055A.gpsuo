@@ -12,10 +12,14 @@
 			Data="4E7C38263136485742503130303B303B303B303B303B303B303B303B303B2E5C416C61726D5C416C61726D2E61736D3B3333323B303B3000"
 		</Breakpoint>
 		<Breakpoint>
+			ClassID="{4993C0DF-0FCE-4D4A-9C53-8119E029EA7B}"
+			Data="FCF438263136485742503130303B303B303B303B303B303B303B303B303B2E5C4B45595C4B45592E61736D3B3330373B303B3000"
 		</Breakpoint>
 		<Breakpoint>
 			ClassID="{4993C0DF-0FCE-4D4A-9C53-8119E029EA7B}"
-			Data="FCF438263136485742503130303B303B303B303B303B303B303B303B303B2E5C4B45595C4B45592E61736D3B3330373B303B3000"
+			Data="6C9738263136485742503130303B303B313B303B303B303B303B303B303B2E5C416C61726D5C416C61726D2E61736D3B3533353B303B3000"
+		</Breakpoint>
+		<Breakpoint>
 		</Breakpoint>
 	</Breakpoints>
 	<UI_ASMConfigPane>
@@ -23,7 +27,6 @@
 	</UI_ASMConfigPane>
 	<OpenState>
 		<OpenFiles>
-			Path=".\\KEY\\KEY.asm"
 			Path=".\\LCD\\LCD_Display.asm"
 			Path=".\\Int_Vec.asm"
 			Path=".\\sys\\Macro.inc"
@@ -39,8 +42,9 @@
 			Path=".\\IT31055A.lik"
 			Path=".\\GXHTV4\\GXHTV4.inc"
 			Path=".\\Release\\IT31055A_Report.html"
+			Path=".\\KEY\\KEY.asm"
 			Path=".\\Alarm\\Alarm.asm"
-			State="233,6324,6324"
+			State="367,10065,10065"
 		</OpenFiles>
 		<OpenFolders>
 			<{42C7D3BF-1E4E-4D73-B672-714D0422E288}>
@@ -247,6 +251,18 @@
 		</Variable>
 		<Variable>
 			Name="R_TimeStatus"
+			Length="10"
+		</Variable>
+		<Variable>
+			Name="R_MoldAlarmTm"
+			Length="10"
+		</Variable>
+		<Variable>
+			Name="R_2Hz"
+			Length="10"
+		</Variable>
+		<Variable>
+			Name="R_MoldAlarmRepeatCnt"
 			Length="10"
 		</Variable>
 		<Variable>

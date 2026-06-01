@@ -135,7 +135,7 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		%bits	R_TimeStatus,AddOthers
 		; %bits	R_TempFlag,D_WithRTRH
 	
-		LDA		#D_LVD_24		; 上电/唤醒后统一把低电检测门槛拉到 2.4V
+		LDA		#D_LVD_27		; 上电/唤醒后统一把低电检测门槛拉到 2.7V
 		STA		P_LVD_Ctrl
 		JSR		F_initSet		
 		%FillLcdDpram #FFH
