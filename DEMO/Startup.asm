@@ -141,16 +141,23 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		%FillLcdDpram #FFH
 		CLI		
 		JSR		F_UpdateTHFromGXHTV4		; 恢复为全显前同步取一次首样本。
+		LDA		R_SaveData+0
+		ORA		R_SaveData+1
+		ORA		R_SaveData+3
+		ORA		R_SaveData+4		
+		BNE		L_PowerOn_ReadOk
+		LDA		R_TempFlag
+		ORA		#D_FirstReadRetry
+		STA		R_TempFlag
 		LDA		#1
 		STA     R_LEDTemp 
-;		JSR		F_DC_Judge			
+;		JSR		F_DC_Judge	
+		L_PowerOn_ReadOk:
 	Wait1_2Sec:
-		%WatchDogClear		
+		%WatchDogClear	
+		JSR		F_RetryFirstTHRead	
 		LDA		R_2Hz
 		CMP		#06H	
-		%btsf	R_TempFlag,D_Err,?L_Next
-		JSR		F_UpdateTHFromGXHTV4
-		?L_Next:
 		BCC		Wait1_2Sec
 		
 	Jump_DispAll:
@@ -203,5 +210,26 @@ L_ServiceLoop:
 		NOP
 		JMP		V_RESET	
 
+;==========================================
+; 函数: F_RetryFirstTHRead
+; 作用: 若 D_FirstReadRetry 标志置位则重读一次温湿度，
+;        成功则清标志，失败则保持标志等待下次重试。
+;==========================================
+.public		F_RetryFirstTHRead
+F_RetryFirstTHRead:
+		LDA		R_TempFlag
+		AND		#D_FirstReadRetry
+		BEQ		?RetryExit
+		JSR		F_UpdateTHFromGXHTV4
+		LDA		R_SaveData+0
+		ORA		R_SaveData+1
+		ORA		R_SaveData+3
+		ORA		R_SaveData+4
+		BEQ		?RetryExit
+		LDA		R_TempFlag
+		AND		#.not.D_FirstReadRetry
+		STA		R_TempFlag
+?RetryExit:
+		RTS
 .END
 

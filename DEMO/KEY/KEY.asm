@@ -149,7 +149,7 @@ F_KeyScan:
 		AND		#D_Bit0
 		BEQ		?L_CheckAllTimeKey
 		LDA		R_KeyTemp
-		ORA		#D_KeyFcClear
+		ORA		#D_KeyAllTime
 		STA		R_KeyTemp
 
 	?L_CheckAllTimeKey:
@@ -157,7 +157,7 @@ F_KeyScan:
 		AND		#D_Bit1
 		BEQ		?L_CheckLightKey
 		LDA		R_KeyTemp
-		ORA		#D_KeyAllTime
+		ORA		#D_KeyFcClear
 		STA		R_KeyTemp
 
 	?L_CheckLightKey:

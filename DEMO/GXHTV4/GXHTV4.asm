@@ -50,8 +50,7 @@
 .PUBLIC		TEMP_INTEGAL
 .PUBLIC		HUM
 .PUBLIC		F_ReadGXHTV4Data
-.PUBLIC		F_StartGXHTV4Measure
-.PUBLIC		F_ReadGXHTV4Result
+
 .PUBLIC		F_CAL_HEX_BCD2
 .PUBLIC		F_CHANGE_CF
 .PUBLIC		R_TempFlag
@@ -68,7 +67,7 @@ R_TempFlag		ds	1
 D_TempF			equ	0x01	;1 for 'F;  0 for 'C ，上电默认为F此Bit需置１
 D_TempError		equ	0x02	;温度出错标志
 D_TempFReg		equ	0x04	;TempF for -
-D_Err			equ	0x08
+D_FirstReadRetry			equ	0x08
 
 INDF0			ds	1
 TEMP_INTEGAH	ds	1
@@ -102,7 +101,7 @@ I2C_WRITE_BIT		.equ				%00000000
 I2C_READ_BIT		.equ				%00000001 
 
 ; GXHTV4 的测量命令是 1 byte，不是旧 SHT3x 风格的 16bit 0x2400。
-CMD_MEASURE_TH		.EQU				0x24
+CMD_MEASURE_TH		.EQU				0xF6
 
 
 
@@ -118,40 +117,18 @@ CMD_MEASURE_TH		.EQU				0x24
 ; 读取成功后更新 TEMP_INTEGAH/TEMP_INTEGAL/HUM。
 ;======================================================================
 F_ReadGXHTV4Data:
-		JSR			F_StartGXHTV4Measure
-		BCC			F_ReadGXHTV4Data_Exit
-		JSR			F_GXHTV4WaitReady
-		JSR			F_ReadGXHTV4Result
-
-F_ReadGXHTV4Data_Exit:
-		RTS
-
-F_StartGXHTV4Measure:
-		LDA			R_TempFlag
-		ORA			#D_TempError
-		STA			R_TempFlag
 		JSR			F_IIC_start
 		LDY			#I2C_ID_GXHTV4
 		JSR			F_IIC_Set8bit
 		JSR			F_RACK
-		BCC			F_StartGXHTV4Measure_StopExit
+		BCC			F_ReadGXHTV4StopExit
 		LDY			#CMD_MEASURE_TH
 		JSR			F_IIC_Set8bit
 		JSR			F_RACK
-		BCC			F_StartGXHTV4Measure_StopExit
+		BCC			F_ReadGXHTV4StopExit
 		JSR			F_IIC_stop
-		SEC
-		RTS
 
-	F_StartGXHTV4Measure_StopExit:
-		JSR			F_IIC_stop
-		CLC
-		RTS
-
-F_ReadGXHTV4Result:
-		LDA			R_TempFlag
-		ORA			#D_TempError
-		STA			R_TempFlag
+		JSR			F_GXHTV4WaitReady
 		JSR			F_I2C_ReadData
 
 		LDA			R_SaveData+0
@@ -161,7 +138,7 @@ F_ReadGXHTV4Result:
 		LDA			R_SaveData+2
 		STA			CNT6
 		JSR			F_crc_check_handle
-		BCC			F_ReadGXHTV4Result_Exit
+		BCC			F_ReadGXHTV4Data_Exit
 		JSR			CAL_IC_TEMP
 
 		LDA			R_SaveData+3
@@ -171,40 +148,36 @@ F_ReadGXHTV4Result:
 		LDA			R_SaveData+5
 		STA			CNT6
 		JSR			F_crc_check_handle
-		BCC			F_ReadGXHTV4Result_Exit
+		BCC			F_ReadGXHTV4Data_Exit
 		JSR			CAL_IC_HUM
-		LDA			R_TempFlag
-		AND			#.not.D_TempError
-		STA			R_TempFlag
-		SEC
 		RTS
 
-	F_ReadGXHTV4Result_Exit:
-		CLC
-		RTS
+F_ReadGXHTV4StopExit:
+		JSR			F_IIC_stop
 
+F_ReadGXHTV4Data_Exit:
+		RTS
 F_GXHTV4WaitReady:
-		; 常规采样保持约 160ms；上电首样本改为在全显阶段预启动，不再额外拉长这里。
-		LDA			#02H
-		PHA
+    ; 10ms 延时（原 160ms 改为 10ms）
+    LDA     #01H          ; 外层循环 1 次
+    PHA
 F_GXHTV4WaitReady_A:
-		LDY			#0FFH
+    LDY     #20H          ; Y = 32 (0x20)
 F_GXHTV4WaitReady_Y:
-		LDX			#0FFH
+    LDX     #0FFH         ; X = 255 (0xFF)
 F_GXHTV4WaitReady_X:
-		DEX
-		BNE			F_GXHTV4WaitReady_X
-		DEY
-		BNE			F_GXHTV4WaitReady_Y
-		PLA
-		SEC
-		SBC			#01H
-		BEQ			F_GXHTV4WaitReady_Done
-		PHA
-		BNE			F_GXHTV4WaitReady_A
-		
+    DEX
+    BNE     F_GXHTV4WaitReady_X
+    DEY
+    BNE     F_GXHTV4WaitReady_Y
+    PLA
+    SEC
+    SBC     #01H
+    BEQ     F_GXHTV4WaitReady_Done
+    PHA
+    BNE     F_GXHTV4WaitReady_A
 F_GXHTV4WaitReady_Done:
-		RTS
+    RTS
 
 ;======================================================================
 ;.COMMENT	@

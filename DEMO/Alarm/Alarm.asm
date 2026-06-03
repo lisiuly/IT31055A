@@ -210,28 +210,14 @@ CheckHalfSecToggle:
 .PUBLIC		F_UpdateTHFromGXHTV4
 F_UpdateTHFromGXHTV4:
     JSR		F_ReadGXHTV4Data
-	LDA		R_TempFlag
-	AND		#D_TempError
-	BNE		UpdateTHFromGXHTV4_Exit
     LDA		TEMP_INTEGAH
     STA		R_TempCH
     LDA		TEMP_INTEGAL
     STA		R_TempCL
     LDA		HUM
     STA		R_HUM
-	JSR		L_Jugde_Err
     JMP		CalculateRFC
-
-UpdateTHFromGXHTV4_Exit:
-	%bitr	R_TempFlag,(D_TempError+D_Err)
-	
-	RTS
-L_Jugde_Err:
-	LDA		R_TempCH
-	ORA		R_TempCL
-	BNE		UpdateTHFromGXHTV4_Exit
-	%bits	R_TempFlag,D_Err
-	RTS	
+    
 ;-------------------------------------------------------
 ; 函数: CalculateRFC
 ; 作用: 根据原始温度高字节的符号位设置当前温度正负标志，并进入温湿度换算主链。
