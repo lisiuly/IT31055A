@@ -19,7 +19,7 @@
 		</Breakpoint>
 		<Breakpoint>
 			ClassID="{4993C0DF-0FCE-4D4A-9C53-8119E029EA7B}"
-			Data="723138263136485742503130303B303B313B303B303B303B303B303B303B2E5C537461727475702E61736D3B3134383B303B3000"
+			Data="E81038263136485742503130303B303B313B303B303B303B303B303B303B2E5C537461727475702E61736D3B3136353B303B3000"
 		</Breakpoint>
 	</Breakpoints>
 	<UI_ASMConfigPane>
@@ -30,7 +30,6 @@
 			Path=".\\LCD\\LCD_Display.asm"
 			Path=".\\Int_Vec.asm"
 			Path=".\\sys\\Macro.inc"
-			Path=".\\LCD\\LCD_Display.tab"
 			Path=".\\RTC\\RTC.inc"
 			Path=".\\I2C\\D_I2C.asm"
 			Path=".\\GXHTV4\\GXHTV4.asm"
@@ -44,6 +43,8 @@
 			Path=".\\KEY\\KEY.asm"
 			Path=".\\Alarm\\Alarm.asm"
 			Path=".\\Release\\IT31055A_Report.html"
+			Path=".\\LCD\\LCD_Display.tab"
+			State="205,5666,5666"
 		</OpenFiles>
 		<OpenFolders>
 			<{42C7D3BF-1E4E-4D73-B672-714D0422E288}>
