@@ -191,7 +191,9 @@ Disp_ProductRefreshCommonBody:
 			; 只要任何一个区域变化，就会把整套主体刷新链都走一遍。
 ;			JSR		Disp_ProductPrepareNormalPage
 			LDX		#T_Other
-			JSR		Display_OneBit			
+			JSR		Display_OneBit	
+			LDX		#T_Temp
+			JSR		Display_OneBit				
 			JSR		F_LoadHistoryViewBuffers
 			JSR		Disp_ProductRefreshValueArea
 			JMP		Disp_ProductRefreshStatusIcons
