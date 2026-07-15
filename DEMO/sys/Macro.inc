@@ -365,7 +365,7 @@ C_MaxVol	equ	45
 		STA		P_IO_PortB_Dir
 		LDA		#00000000b		
 		STA		P_IO_PortB_Data		;PB1·äÃùÆ÷£¬PB0±³¹â
-
+		STA		R_PortB_Data_Buf
 		LDA		#00H
 		STA		P_IO_PortC_Dir
 		LDA		#00000000b

@@ -47,6 +47,7 @@
 ;.PUBLIC		Sub_AlmHour
 ;.PUBLIC		Down_Day
 .PUBLIC			R_KeyFlag1	
+.PUBLIC			R_PortB_Data_Buf	
 ;==========================================
 ;Variable RAM declare area
 ;==========================================
@@ -134,6 +135,7 @@ R_LEDTemp		ds	1
 
 R_ToneDuty		ds	1
 R_ToneVol		ds	1
+R_PortB_Data_Buf	ds	1
 ;=====================================================
 .CODE
 
@@ -356,9 +358,9 @@ F_backlightOpen:
 		CLI
 		LDA		#D_LED_ON
 		STA		R_LEDFlag
-		LDA		P_IO_PortB_Data
-		ORA		#D_Bit0
-		STA		P_IO_PortB_Data
+;		LDA		P_IO_PortB_Data
+;		ORA		#D_Bit0
+;		STA		P_IO_PortB_Data
 		LDA		#00H
 		STA		R_LEDTemp
 		LDA		#D_8SecBL
@@ -371,15 +373,26 @@ INT_PlayPWM:				;在中断里调用
 	    LDA     R_LEDFlag
 	    AND     #D_LED_ON
 	    BEQ     ?DisLED		; 背光改成直接高低电平，不再做软件 PWM
-		LDA		P_IO_PortB_Data
+	;	LDA		P_IO_PortB_Data
+		LDA		R_PortB_Data_Buf
+        AND		#D_Bit0
+		BNE		?Exit
+		LDA		R_PortB_Data_Buf
 		ORA		#D_Bit0
+		STA		R_PortB_Data_Buf
 		STA		P_IO_PortB_Data
 		RTS
 
 	?DisLED:
-		LDA		P_IO_PortB_Data
+		LDA		R_PortB_Data_Buf
+        AND		#D_Bit0
+		BEQ		?Exit
+		LDA		R_PortB_Data_Buf
+;		LDA		P_IO_PortB_Data
 		AND		#.not.D_Bit0
+		STA		R_PortB_Data_Buf
 		STA		P_IO_PortB_Data
+		?Exit:	
 		RTS			
 		
 		
@@ -427,9 +440,9 @@ F_Judge_ToneIO:
 		LDA		#00
 		STA		R_LEDFlag
 		STA		R_LEDTemp
-		LDA		P_IO_PortB_Data
-		AND		#.not.D_Bit0
-		STA		P_IO_PortB_Data
+;		LDA		P_IO_PortB_Data
+;		AND		#.not.D_Bit0
+;		STA		P_IO_PortB_Data
 		?Exit_LED:		
 		RTS
 ;==============================================================

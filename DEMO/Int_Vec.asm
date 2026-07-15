@@ -81,17 +81,19 @@ V_IRQ:
     AND     #D_ToneOn
     BEQ     ?DisTone   ; 如果声音关闭，则跳转到?DisTone处理
 ;---------------------------------	
-	?On:							;蜂鸣器PB1
-	LDA		P_IO_PortB_Data
+	?On:		;蜂鸣器PB1
+	LDA		R_PortB_Data_Buf	
 	EOR		#D_Bit1
+	STA		R_PortB_Data_Buf	
 	STA		P_IO_PortB_Data
-;	STA		R_PortD_Data_Buf
+
 	JMP		?L_128HZ_INT
 ;--------------------------------
 ?DisTone:
-	LDA		P_IO_PortB_Data
+	LDA		R_PortB_Data_Buf	
+;	LDA		P_IO_PortB_Data
 	AND		#.not.D_Bit1
-;	STA		R_PortD_Data_Buf
+	STA		R_PortB_Data_Buf
 	STA		P_IO_PortB_Data
 
 ?L_128HZ_INT:	; 检查是否为128Hz定时器中断

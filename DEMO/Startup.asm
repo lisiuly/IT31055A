@@ -141,6 +141,8 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		%FillLcdDpram #FFH
 		CLI		
 		JSR		F_UpdateTHFromGXHTV4		; 恢复为全显前同步取一次首样本。
+		LDA		#D_LED_ON
+		STA     R_LEDFlag 
 		LDA		R_SaveData+0
 		ORA		R_SaveData+1
 		ORA		R_SaveData+3
@@ -149,17 +151,24 @@ L_PowerOn:  ;---------------------;POWER UP	开机
 		LDA		R_TempFlag
 		ORA		#D_FirstReadRetry
 		STA		R_TempFlag
-		LDA		#1
-		STA     R_LEDTemp 
 ;		JSR		F_DC_Judge	
 		L_PowerOn_ReadOk:
 	Wait1_2Sec:
 		%WatchDogClear	
 		JSR		F_RetryFirstTHRead	
 		LDA		R_2Hz
+		CMP		#02H
+		BNE		?L_PowerOnBLChecked
+		LDA		#D_LED_ON
+		STA     R_LEDFlag
+	?L_PowerOnBLChecked:
+		LDA		R_2Hz
 		CMP		#06H	
 		BCC		Wait1_2Sec
-		
+		LDA		#00H
+		STA		R_LEDFlag
+		STA		R_LEDTemp
+		STA		R_BLTime		
 	Jump_DispAll:
 		%FillLcdDpram #00H 
 		JSR		F_CheckTempMode
