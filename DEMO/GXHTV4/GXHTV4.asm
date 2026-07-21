@@ -76,6 +76,7 @@ INDF0			ds	1
 TEMP_INTEGAH	ds	1
 TEMP_INTEGAL	ds	1
 HUM				ds	1
+R_HumSlowOffset		ds	1
 
 CNT1	ds		1
 CNT2	ds		1
@@ -359,8 +360,7 @@ CAL_IC_HUM:   ;IN:CNT4,CNT5
 		SBC			#06H
 		BCS			CAL_HUM_CLAMP_HIGH
 		LDA			#00H
-		STA			HUM
-		RTS
+		JMP			CAL_HUM_STORE
 
 CAL_HUM_CLAMP_HIGH:
 		CMP			#064H
@@ -368,12 +368,31 @@ CAL_HUM_CLAMP_HIGH:
 		LDA			#064H
 
 ; Humidity calibration runs after 0..100 clamp.
-; Only >=55%RH subtracts 5%RH, so the adjusted value cannot go negative.
+; >=55%RH slowly increases subtract offset to 5; below 55 slowly returns it to 0.
 CAL_HUM_STORE:
+		TAX
 		CMP			#C_GXHTV4HumThreshold55
-		BCC			GXHTV4HumCal_Store
+		BCC			GXHTV4HumCal_TargetZero
+
+GXHTV4HumCal_TargetDrop5:
+		LDA			R_HumSlowOffset
+		CMP			#C_GXHTV4HumDrop5
+		BCS			GXHTV4HumCal_Apply
+		INC			R_HumSlowOffset
+		JMP			GXHTV4HumCal_Apply
+
+GXHTV4HumCal_TargetZero:
+		LDA			R_HumSlowOffset
+		BEQ			GXHTV4HumCal_Apply
+		DEC			R_HumSlowOffset
+
+GXHTV4HumCal_Apply:
+		TXA
 		SEC
-		SBC			#C_GXHTV4HumDrop5
+		SBC			R_HumSlowOffset
+		BCS			GXHTV4HumCal_Store
+		LDA			#00H
+
 GXHTV4HumCal_Store:
 		STA			HUM
 CAL_HUM_OUT:
