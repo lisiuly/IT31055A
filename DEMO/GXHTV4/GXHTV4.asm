@@ -23,6 +23,9 @@
 
 ;==========================================
 ; Constant define area
+C_GXHTV4TempOffset03	.equ	03H	; +0.3C, raw unit is 0.1C
+C_GXHTV4HumThreshold55	.equ	37H	; 55%RH
+C_GXHTV4HumDrop5		.equ	05H	; -5%RH
 ;==========================================
 
 
@@ -253,6 +256,84 @@ CAL_TEMP_PLUS: ; -
     	LDA			#0C8H
     	STA			TEMP_INTEGAL
 CAL_TEMP_OUT:
+		JSR			F_GXHTV4TempAdd03
+		RTS
+
+; Temp calibration: signed value uses TEMP_INTEGAH bit7 as minus flag.
+; +0.3C means positive values add 3 counts; negative values reduce magnitude.
+; Cross-zero cases are handled here: -0.2C -> +0.1C, -0.3C -> 0.0C.
+F_GXHTV4TempAdd03:
+		LDA			TEMP_INTEGAH
+		AND			#80H
+		BEQ			GXHTV4TempCal_Positive
+
+GXHTV4TempCal_Negative:
+		LDA			TEMP_INTEGAH
+		AND			#7FH
+		BNE			GXHTV4TempCal_NegativeSub16
+
+		LDA			TEMP_INTEGAL
+		CMP			#C_GXHTV4TempOffset03
+		BEQ			GXHTV4TempCal_ToZero
+		BCS			GXHTV4TempCal_NegativeSubLow
+
+		LDA			#C_GXHTV4TempOffset03
+		SEC
+		SBC			TEMP_INTEGAL
+		STA			TEMP_INTEGAL
+		LDA			#00H
+		STA			TEMP_INTEGAH
+		RTS
+
+GXHTV4TempCal_NegativeSubLow:
+		LDA			TEMP_INTEGAL
+		SEC
+		SBC			#C_GXHTV4TempOffset03
+		STA			TEMP_INTEGAL
+		LDA			#80H
+		STA			TEMP_INTEGAH
+		RTS
+
+GXHTV4TempCal_NegativeSub16:
+		SEC
+		LDA			TEMP_INTEGAL
+		SBC			#C_GXHTV4TempOffset03
+		STA			TEMP_INTEGAL
+		LDA			TEMP_INTEGAH
+		AND			#7FH
+		SBC			#00H
+		ORA			#80H
+		STA			TEMP_INTEGAH
+		RTS
+
+GXHTV4TempCal_ToZero:
+		LDA			#00H
+		STA			TEMP_INTEGAL
+		STA			TEMP_INTEGAH
+		RTS
+
+; Positive path clamps after offset so +50.0C stays the display upper limit.
+GXHTV4TempCal_Positive:
+		CLC
+		LDA			TEMP_INTEGAL
+		ADC			#C_GXHTV4TempOffset03
+		STA			TEMP_INTEGAL
+		LDA			TEMP_INTEGAH
+		ADC			#00H
+		STA			TEMP_INTEGAH
+
+		SEC
+		LDA			TEMP_INTEGAL
+		SBC			#0BCH
+		LDA			TEMP_INTEGAH
+		SBC			#02H
+		BCC			GXHTV4TempCal_Exit
+		LDA			#02H
+		STA			TEMP_INTEGAH
+		LDA			#0BCH
+		STA			TEMP_INTEGAL
+
+GXHTV4TempCal_Exit:
 		RTS
 ;======================================================================
 ;======================================================================
@@ -286,7 +367,14 @@ CAL_HUM_CLAMP_HIGH:
 		BCC			CAL_HUM_STORE
 		LDA			#064H
 
+; Humidity calibration runs after 0..100 clamp.
+; Only >=55%RH subtracts 5%RH, so the adjusted value cannot go negative.
 CAL_HUM_STORE:
+		CMP			#C_GXHTV4HumThreshold55
+		BCC			GXHTV4HumCal_Store
+		SEC
+		SBC			#C_GXHTV4HumDrop5
+GXHTV4HumCal_Store:
 		STA			HUM
 CAL_HUM_OUT:
 ;==========================================
